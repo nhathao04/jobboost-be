@@ -34,13 +34,13 @@ module.exports = (sequelize, DataTypes) => {
         onDelete: "RESTRICT",
       },
       transaction_type: {
-        type: DataTypes.ENUM(
-          "job_payment",
-          "premium_subscription",
-          "platform_fee",
-          "refund"
-        ),
+        type: DataTypes.STRING,
         allowNull: false,
+        validate: {
+          isIn: [
+            ["job_payment", "premium_subscription", "platform_fee", "refund"],
+          ],
+        },
       },
       gross_amount: {
         type: DataTypes.DECIMAL(12, 2),

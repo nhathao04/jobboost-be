@@ -33,12 +33,18 @@ module.exports = (sequelize, DataTypes) => {
         onDelete: "SET NULL",
       },
       job_type: {
-        type: DataTypes.ENUM("project", "freelance", "part_time"),
+        type: DataTypes.STRING,
         allowNull: false,
+        validate: {
+          isIn: [["project", "freelance", "part_time"]],
+        },
       },
       budget_type: {
-        type: DataTypes.ENUM("fixed", "hourly"),
+        type: DataTypes.STRING,
         allowNull: false,
+        validate: {
+          isIn: [["fixed", "hourly"]],
+        },
       },
       budget_min: {
         type: DataTypes.DECIMAL(10, 2),
@@ -60,18 +66,25 @@ module.exports = (sequelize, DataTypes) => {
         defaultValue: false,
       },
       experience_level: {
-        type: DataTypes.ENUM("beginner", "intermediate", "advanced"),
+        type: DataTypes.STRING,
         defaultValue: "beginner",
+        validate: {
+          isIn: [["beginner", "intermediate", "advanced"]],
+        },
       },
       status: {
-        type: DataTypes.ENUM(
-          "draft",
-          "active",
-          "paused",
-          "completed",
-          "cancelled"
-        ),
+        type: DataTypes.STRING,
         defaultValue: "active",
+        validate: {
+          isIn: [["draft", "active", "paused", "completed", "cancelled"]],
+        },
+      },
+      approval_status: {
+        type: DataTypes.STRING,
+        defaultValue: "pending",
+        validate: {
+          isIn: [["pending", "approved", "rejected"]],
+        },
       },
       applications_count: {
         type: DataTypes.INTEGER,
@@ -105,6 +118,12 @@ module.exports = (sequelize, DataTypes) => {
         },
         {
           fields: ["budget_min", "budget_max"],
+        },
+        {
+          fields: ["location"],
+        },
+        {
+          fields: ["approval_status"],
         },
       ],
     }
