@@ -31,8 +31,11 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING(20),
       },
       user_type: {
-        type: DataTypes.ENUM("employer", "student", "admin"),
+        type: DataTypes.STRING,
         allowNull: false,
+        validate: {
+          isIn: [["student", "employer", "admin"]],
+        },
       },
       is_active: {
         type: DataTypes.BOOLEAN,

@@ -1,5 +1,5 @@
 const express = require("express");
-const { sequelize, testConnection } = require("./config/database");
+const { sequelize, testConnection } = require("./config/sequelize");
 const config = require("./config");
 const app = require("./app");
 
@@ -14,9 +14,9 @@ const initializeDatabase = async () => {
     // Test database connection
     await testConnection();
 
-    // Sync database models (create tables if they don't exist)
-    await sequelize.sync({ force: false }); // set force: true to drop and recreate tables
-    console.log("✅ Database models synchronized successfully");
+    // Skip syncing since we don't have CREATE TABLE permission
+    // The tables should already exist in the remote database
+    console.log("✅ Database connection established successfully");
   } catch (error) {
     console.error("❌ Database initialization failed:", error);
     process.exit(1);

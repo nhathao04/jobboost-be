@@ -54,8 +54,11 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.DATEONLY,
       },
       status: {
-        type: DataTypes.ENUM("active", "completed", "cancelled", "disputed"),
+        type: DataTypes.STRING,
         defaultValue: "active",
+        validate: {
+          isIn: [["active", "completed", "cancelled", "disputed"]],
+        },
       },
       completion_notes: {
         type: DataTypes.TEXT,

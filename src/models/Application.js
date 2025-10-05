@@ -38,8 +38,11 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.ARRAY(DataTypes.TEXT),
       },
       status: {
-        type: DataTypes.ENUM("pending", "accepted", "rejected", "withdrawn"),
+        type: DataTypes.STRING,
         defaultValue: "pending",
+        validate: {
+          isIn: [["pending", "accepted", "rejected", "withdrawn"]],
+        },
       },
       applied_at: {
         type: DataTypes.DATE,
@@ -47,6 +50,12 @@ module.exports = (sequelize, DataTypes) => {
       },
       reviewed_at: {
         type: DataTypes.DATE,
+      },
+      rejection_reason: {
+        type: DataTypes.TEXT,
+      },
+      employer_notes: {
+        type: DataTypes.TEXT,
       },
     },
     {
