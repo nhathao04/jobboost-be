@@ -1,13 +1,13 @@
 module.exports = (sequelize, DataTypes) => {
   const Job = sequelize.define(
-    'Job',
+    "Job",
     {
       id: {
         type: DataTypes.UUID,
         defaultValue: DataTypes.UUIDV4,
         primaryKey: true,
       },
-      owner: {
+      owner_id: {
         type: DataTypes.UUID,
         allowNull: false,
       },
@@ -19,13 +19,24 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.TEXT,
         allowNull: false,
       },
+      // category_id đã được comment do không tồn tại trong database
+      // category_id: {
+      //   type: DataTypes.UUID,
+      //   allowNull: true,
+      // },
       job_type: {
-        type: DataTypes.ENUM('project', 'freelance', 'part_time'),
+        type: DataTypes.STRING,
         allowNull: false,
+        validate: {
+          isIn: [["PROJECT", "FREELANCE", "PART_TIME"]],
+        },
       },
       budget_type: {
-        type: DataTypes.ENUM('fixed', 'hourly'),
+        type: DataTypes.STRING,
         allowNull: false,
+        validate: {
+          isIn: [["FIXED", "HOURLY"]],
+        },
       },
       budget_min: {
         type: DataTypes.DECIMAL(15, 2),
@@ -34,31 +45,66 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.DECIMAL(15, 2),
       },
       currency: {
-        type: DataTypes.ENUM('USD', 'VND', 'EUR', 'JPY'),
-        defaultValue: 'VND',
+        type: DataTypes.STRING,
+        defaultValue: "VND",
+        validate: {
+          isIn: [["USD", "VND", "EUR", "JPY"]],
+        },
       },
       experience_level: {
-        type: DataTypes.ENUM('intern', 'junior', 'middle', 'senior'),
-        defaultValue: 'intern',
+        type: DataTypes.STRING,
+        defaultValue: "INTERN",
+        validate: {
+          isIn: [["INTERN", "JUNIOR", "MIDDLE", "SENIOR"]],
+        },
+      },
+      deadline: {
+        type: DataTypes.DATE,
+        allowNull: true,
       },
       status: {
-        type: DataTypes.ENUM('draft', 'active', 'paused', 'completed', 'cancelled', 'rejected', 'pending'),
-        defaultValue: 'pending',
+        type: DataTypes.STRING,
+        defaultValue: "pending",
+        validate: {
+          isIn: [
+            ["active", "paused", "completed", "deleted", "rejected", "pending"],
+          ],
+        },
+        comment:
+          "pending: waiting for admin approval; active: approved and visible",
       },
       applications_count: {
         type: DataTypes.INTEGER,
         defaultValue: 0,
       },
-      views_count: {
-        type: DataTypes.INTEGER,
-        defaultValue: 0,
+      skills_required: {
+        type: DataTypes.ARRAY(DataTypes.STRING),
+        defaultValue: [],
+      },
+      rejection_reason: {
+        type: DataTypes.TEXT,
+        allowNull: true,
       },
     },
     {
-      tableName: 'jobs',
+      tableName: "jobs",
       timestamps: true,
     }
   );
+
+  // Define associations in the model index file
+  Job.associate = (models) => {
+    // Liên kết với Category đã bị vô hiệu hóa vì cột category_id không tồn tại
+    // Job.belongsTo(models.Category, {
+    //   foreignKey: "category_id",
+    //   as: "category",
+    // });
+    Job.hasMany(models.Application, {
+      foreignKey: "job_id",
+      as: "applications",
+    });
+    // Note: User is managed by Supabase, not a Sequelize model
+  };
 
   return Job;
 };
