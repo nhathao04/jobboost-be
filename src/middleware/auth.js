@@ -21,5 +21,4 @@ const authMiddleware = (req, res, next) => {
 module.exports = {
   authenticate: authMiddleware,
   authMiddleware,
-  authenticateAdmin,
 };
