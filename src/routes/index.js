@@ -2,6 +2,8 @@ const express = require("express");
 const router = express.Router();
 const jobRoutes = require("./jobRoutes");
 const applicationRoutes = require("./applicationRoutes");
+const cvRoutes = require("./cv");
+const { authenticate } = require("../middleware/auth");
 // const categoryRoutes = require("./categoryRoutes");
 
 // API Health Check
@@ -13,9 +15,18 @@ router.get("/health", (req, res) => {
   });
 });
 
+router.get("/auth-check", authenticate, (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "Auth middleware is working " + req.userId,
+    timestamp: new Date(),
+  });
+});
+
 // Mount routes
 router.use("/v1", jobRoutes);
 router.use("/v1", applicationRoutes);
+router.use("/v1", cvRoutes);
 // router.use("/v1", categoryRoutes);
 
 module.exports = router;

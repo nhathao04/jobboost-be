@@ -1,13 +1,22 @@
-const { Application, Job, FreelancerProfile, sequelize } = require("../models");
-const { handleError } = require("../utils/helpers");
+const { Application, Job, FreelancerProfile, CV, sequelize } = require("../models");
 const { Op } = require("sequelize");
 
 // Apply for a job (Freelancer)
 exports.applyForJob = async (req, res) => {
   try {
     const { jobId } = req.params;
-    // const userId = req.user.id; // From auth middleware
-    const userId = "6c23bafd-d79b-4a71-a7e8-cfd04e2bd405"; // From auth middleware
+    const userId = req.userId; // From auth middleware
+
+    // If user haven't any CV, block apply
+    const cvCount = await CV.count({
+      where: { user_id: userId, status: 'active' }
+    });
+    if (cvCount === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "You must upload at least one active CV before applying for jobs",
+      });
+    }
 
     const { cover_letter, proposed_rate, proposed_timeline, portfolio_links } =
       req.body;
@@ -42,7 +51,6 @@ exports.applyForJob = async (req, res) => {
         applicant_id: userId,
       },
     });
-    console.log(1)
 
     if (existingApplication) {
       return res.status(400).json({
@@ -55,13 +63,8 @@ exports.applyForJob = async (req, res) => {
     const application = await Application.create({
       job_id: jobId,
       applicant_id: userId,
-      cover_letter,
-      proposed_rate,
-      proposed_timeline,
-      portfolio_links: portfolio_links || [],
       status: "pending",
     });
-    console.log(2)
 
     // Increment applications_count on job
     await job.increment("applications_count");
@@ -75,6 +78,7 @@ exports.applyForJob = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "An error occurred while submitting the application",
+      error: error.message,
     });
   }
 };
@@ -82,7 +86,7 @@ exports.applyForJob = async (req, res) => {
 // Get my applications (Freelancer)
 exports.getMyApplications = async (req, res) => {
   try {
-    const userId = req.user.id; // From auth middleware
+    const userId = req.userId; // From auth middleware
     const { status, page = 1, limit = 10 } = req.query;
 
     // Build where clause
@@ -103,8 +107,6 @@ exports.getMyApplications = async (req, res) => {
         {
           model: Job,
           as: "job",
-          // Category đã bị comment vì không có liên kết
-          // include: [{ model: Category, as: "category" }],
         },
       ],
       order: [["createdAt", "DESC"]],
@@ -123,7 +125,11 @@ exports.getMyApplications = async (req, res) => {
       },
     });
   } catch (error) {
-    handleError(res, error);
+    res.status(500).json({
+      success: false,
+      message: "An error occurred while getting the applications",
+      error: error.message,
+    });
   }
 };
 
@@ -131,7 +137,7 @@ exports.getMyApplications = async (req, res) => {
 exports.withdrawApplication = async (req, res) => {
   try {
     const { applicationId } = req.params;
-    const userId = req.user.id; // From auth middleware
+    const userId = req.userId; // From auth middleware
 
     const application = await Application.findOne({
       where: {
@@ -164,7 +170,11 @@ exports.withdrawApplication = async (req, res) => {
       message: "Application withdrawn successfully",
     });
   } catch (error) {
-    handleError(res, error);
+    return res.status(500).json({
+      success: false,
+      message: "An error occurred while withdrawing the application",
+      error: error.message,
+    });
   }
 };
 
@@ -172,7 +182,7 @@ exports.withdrawApplication = async (req, res) => {
 exports.getApplicationsForJob = async (req, res) => {
   try {
     const { jobId } = req.params;
-    const userId = req.user.id; // From auth middleware
+    const userId = req.userId; // From auth middleware
 
     // Find the job to check ownership
     const job = await Job.findOne({
@@ -205,20 +215,6 @@ exports.getApplicationsForJob = async (req, res) => {
     // Get applications
     const { count, rows: applications } = await Application.findAndCountAll({
       where,
-      // Note: FreelancerProfile association might need to be set up in application.model.js
-      // include: [
-      //   {
-      //     model: FreelancerProfile,
-      //     as: "freelancer",
-      //     attributes: [
-      //       "id",
-      //       "title",
-      //       "skills",
-      //       "experience_level",
-      //       "hourly_rate",
-      //     ],
-      //   },
-      // ],
       order: [["createdAt", "DESC"]],
       limit,
       offset,
@@ -235,7 +231,11 @@ exports.getApplicationsForJob = async (req, res) => {
       },
     });
   } catch (error) {
-    handleError(res, error);
+    return res.status(500).json({
+      success: false,
+      message: "An error occurred while getting the applications",
+      error: error.message,
+    });
   }
 };
 
@@ -244,7 +244,7 @@ exports.updateApplicationStatus = async (req, res) => {
   try {
     const { applicationId } = req.params;
     const { status, employer_notes } = req.body;
-    const userId = req.user.id; // From auth middleware
+    const userId = req.userId; // From auth middleware
 
     // Validate status
     if (!["accepted", "rejected"].includes(status)) {
@@ -286,7 +286,11 @@ exports.updateApplicationStatus = async (req, res) => {
       data: application,
     });
   } catch (error) {
-    handleError(res, error);
+    return res.status(500).json({
+      success: false,
+      message: "An error occurred while updating the application status",
+      error: error.message,
+    });
   }
 };
 
@@ -294,7 +298,7 @@ exports.updateApplicationStatus = async (req, res) => {
 exports.getApplicationDetail = async (req, res) => {
   try {
     const { applicationId } = req.params;
-    const userId = req.user.id; // From auth middleware
+    const userId = req.userId; // From auth middleware
 
     const application = await Application.findByPk(applicationId, {
       include: [{ model: Job, as: "job" }],
@@ -324,7 +328,11 @@ exports.getApplicationDetail = async (req, res) => {
       data: application,
     });
   } catch (error) {
-    handleError(res, error);
+    return res.status(500).json({
+      success: false,
+      message: "An error occurred while getting the application details",
+      error: error.message,
+    });
   }
 };
 
@@ -354,7 +362,11 @@ exports.getApplicationById = async (req, res) => {
 
     res.status(200).json({ success: true, data: application });
   } catch (error) {
-    handleError(res, error);
+    return res.status(500).json({
+      success: false,
+      message: "An error occurred while getting the application",
+      error: error.message,
+    });
   }
 };
 
@@ -376,6 +388,10 @@ exports.deleteApplication = async (req, res) => {
       .status(200)
       .json({ success: true, message: "Application deleted successfully" });
   } catch (error) {
-    handleError(res, error);
+    return res.status(500).json({
+      success: false,
+      message: "An error occurred while deleting the application",
+      error: error.message,
+    });
   }
 };

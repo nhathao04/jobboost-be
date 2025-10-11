@@ -19,11 +19,10 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.TEXT,
         allowNull: false,
       },
-      // category_id đã được comment do không tồn tại trong database
-      // category_id: {
-      //   type: DataTypes.UUID,
-      //   allowNull: true,
-      // },
+      image_url: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
       job_type: {
         type: DataTypes.STRING,
         allowNull: false,
@@ -89,6 +88,8 @@ module.exports = (sequelize, DataTypes) => {
     {
       tableName: "jobs",
       timestamps: true,
+      createdAt: "created_at",
+      updatedAt: "updated_at",
     }
   );
 
