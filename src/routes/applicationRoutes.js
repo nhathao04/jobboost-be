@@ -5,31 +5,37 @@ const { authenticate, isFreelancer, isClient } = require("../middleware/auth");
 
 // Freelancer routes
 router.post(
-  "/jobs/:jobId/apply",
+  "/applications/:jobId",
+  authenticate,
   applicationController.applyForJob
 );
 router.get(
-  "/applications/my-applications",
+  "/applications",
+  authenticate,
   applicationController.getMyApplications
 );
 router.put(
   "/applications/:applicationId/withdraw",
+  authenticate, 
   applicationController.withdrawApplication
 );
 
 // Client (employer) routes
-router.get(
-  "/jobs/:jobId/applications",
-  applicationController.getApplicationsForJob
-);
+// router.get(
+//   "/jobs/:jobId/applications",
+//   authenticate,
+//   applicationController.getApplicationsForJob
+// );
 router.put(
   "/applications/:applicationId/status",
+  authenticate,
   applicationController.updateApplicationStatus
 );
 
 // Common routes (both freelancer and client)
 router.get(
   "/applications/:applicationId",
+  authenticate,
   applicationController.getApplicationDetail
 );
 

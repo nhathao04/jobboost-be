@@ -1,12 +1,11 @@
 const { Job, Application, sequelize } = require("../models");
-const { handleError } = require("../utils/helpers");
 const { Op } = require("sequelize");
 
 // Create a new job posting (Client/Employer)
 exports.createJob = async (req, res) => {
   try {
     // Get user from auth middleware
-    const userId = "970ac06d-3762-4ba3-aa8d-c95637a49fc4"; // Assuming Supabase auth middleware sets this
+    const userId = req.userId; // Assuming Supabase auth middleware sets this
 
     const {
       title,
@@ -81,14 +80,11 @@ exports.getAllJobs = async (req, res) => {
       sort_dir = "DESC",
     } = req.query;
 
-    // Build where clause
     const where = {
-      status: "active", // Only show approved jobs
+      status: "active", 
     };
 
-    // Apply filters
-    // category_id đã bị comment vì không có trong database
-    // if (category_id) where.category_id = category_id;
+
     if (job_type) where.job_type = job_type;
     if (experience_level) where.experience_level = experience_level;
     if (location) where.location = location;
@@ -107,16 +103,11 @@ exports.getAllJobs = async (req, res) => {
       where.skills_required = { [Op.overlap]: skillsArray };
     }
 
-    // Calculate pagination
     const offset = (page - 1) * limit;
 
     // Get jobs
     const { count, rows: jobs } = await Job.findAndCountAll({
       where,
-      // Category đã bị comment vì không có liên kết
-      // include: [
-      //   { model: Category, as: "category" }
-      // ],
       order: [[sort_by, sort_dir]],
       limit,
       offset,
@@ -144,17 +135,15 @@ exports.getAllJobs = async (req, res) => {
 // Get job details by ID
 exports.getJobById = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { jobId } = req.params;
+
+    console.log(jobId)
 
     const job = await Job.findOne({
       where: {
-        id: id,
-        status: "active", // Only return active jobs
+        id: jobId,
+        status: "active",
       },
-      // Category đã bị comment vì không có liên kết
-      // include: [
-      //   { model: Category, as: "category" }
-      // ],
     });
 
     if (!job) {
@@ -165,14 +154,18 @@ exports.getJobById = async (req, res) => {
     }
 
     // Increment view count
-    await job.increment("views_count");
+    // await job.increment("views_count");
 
     res.status(200).json({
       success: true,
       data: job,
     });
   } catch (error) {
-    handleError(res, error);
+    res.status(500).json({
+      success: false,
+      message: "An error occurred while fetching the job",
+      error: error.message,
+    });
   }
 };
 
@@ -180,7 +173,7 @@ exports.getJobById = async (req, res) => {
 exports.updateJob = async (req, res) => {
   try {
     const { jobId } = req.params;
-    const userId = "970ac06d-3762-4ba3-aa8d-c95637a49fc4"; // From auth middleware
+    const userId = req.userId; // From auth middleware
 
     const job = await Job.findOne({
       where: { id: jobId },
@@ -242,7 +235,7 @@ exports.updateJob = async (req, res) => {
 exports.deleteJob = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user.id; // From auth middleware
+    const userId = req.userId; // From auth middleware
 
     const job = await Job.findOne({
       where: { id: id },
@@ -287,14 +280,18 @@ exports.deleteJob = async (req, res) => {
       message: "Job deleted successfully",
     });
   } catch (error) {
-    handleError(res, error);
+    return res.status(500).json({
+      success: false,
+      message: "An error occurred while deleting the job",
+      error: error.message,
+    });
   }
 };
 
 // Get my posted jobs (Client/Employer)
 exports.getMyJobs = async (req, res) => {
   try {
-    const userId = req.user.id; // From auth middleware
+    const userId = req.userId; // From auth middleware
     const { status, page = 1, limit = 10 } = req.query;
 
     // Build where clause
@@ -328,7 +325,11 @@ exports.getMyJobs = async (req, res) => {
       },
     });
   } catch (error) {
-    handleError(res, error);
+    return res.status(500).json({
+      success: false,
+      message: "An error occurred while fetching your jobs",
+      error: error.message,
+    });
   }
 };
 
@@ -337,14 +338,6 @@ exports.reviewJob = async (req, res) => {
   try {
     const { jobId } = req.params;
     const { status, rejection_reason } = req.body;
-
-    // // Only admin can approve/reject jobs
-    // if (!req.user.is_admin) {
-    //   return res.status(403).json({
-    //     success: false,
-    //     message: "Only administrators can approve or reject jobs",
-    //   });
-    // }
 
     // Validate status
     if (!["active", "rejected"].includes(status)) {
@@ -389,14 +382,6 @@ exports.reviewJob = async (req, res) => {
 // Admin: Get jobs pending approval
 exports.getPendingJobs = async (req, res) => {
   try {
-    // Only admin can see pending jobs
-    // if (!req.user.is_admin) {
-    //   return res.status(403).json({
-    //     success: false,
-    //     message: "Only administrators can view pending jobs",
-    //   });
-    // }
-
     const { page, limit } = req.query;
     const offset = (page - 1) * limit;
 
