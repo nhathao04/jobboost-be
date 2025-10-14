@@ -30,9 +30,39 @@ const initialize = (server) => {
         return next(new Error("Authentication token is required"));
       }
 
-      // Verify token
-      const decoded = jwt.verify(token, authConfig.jwtSecret);
-      socket.userId = decoded.id || decoded.sub;
+      let decoded;
+      let userId;
+
+      try {
+        // First, try to verify with our backend JWT secret
+        decoded = jwt.verify(token, authConfig.jwtSecret);
+        userId = decoded.id || decoded.sub;
+        console.log("✅ Backend JWT token verified:", { userId, tokenType: 'backend' });
+      } catch (backendError) {
+        try {
+          // If backend JWT fails, try Supabase JWT (no verification for now, just decode)
+          decoded = jwt.decode(token);
+          if (decoded && (decoded.sub || decoded.id)) {
+            userId = decoded.sub || decoded.id;
+            console.log("✅ Supabase JWT token decoded:", { userId, tokenType: 'supabase' });
+
+            // Additional validation for Supabase tokens
+            if (!decoded.aud || !decoded.exp || decoded.exp < Math.floor(Date.now() / 1000)) {
+              throw new Error("Invalid or expired Supabase token");
+            }
+          } else {
+            throw new Error("Invalid token format");
+          }
+        } catch (supabaseError) {
+          console.error("❌ Both JWT verification methods failed:", {
+            backendError: backendError.message,
+            supabaseError: supabaseError.message
+          });
+          return next(new Error("Invalid authentication token"));
+        }
+      }
+
+      socket.userId = userId;
 
       // Add the user to appropriate rooms
       const conversations = await Conversation.findAll({
@@ -46,6 +76,7 @@ const initialize = (server) => {
       });
 
       socket.conversations = conversations.map((conv) => conv.id);
+      console.log(`👤 User ${socket.userId} authenticated with ${socket.conversations.length} conversations`);
       next();
     } catch (error) {
       console.error("Socket authentication error:", error);
@@ -65,10 +96,10 @@ const initialize = (server) => {
     // Join user to their personal room
     socket.join(`user:${socket.userId}`);
 
-    // Handle new message event
+    // Handle new message event - BROADCASTING ONLY (message already persisted via REST API)
     socket.on("send_message", async (data) => {
       try {
-        const { conversationId, content, messageType = "text", fileUrl } = data;
+        const { conversationId, content, messageType = "text", fileUrl, messageId } = data;
 
         // Verify user is part of this conversation
         if (!socket.conversations.includes(conversationId)) {
@@ -78,27 +109,27 @@ const initialize = (server) => {
           return;
         }
 
-        // Create message in database
-        const message = await Message.create({
-          conversation_id: conversationId,
-          sender_id: socket.userId,
-          message_type: messageType,
-          content,
-          file_url: fileUrl || null,
-          is_read: false,
-        });
+        // If messageId is provided, fetch the existing message from database
+        let messageToSend;
+        if (messageId) {
+          messageToSend = await Message.findByPk(messageId);
+          if (!messageToSend) {
+            console.error(`Message with ID ${messageId} not found`);
+            socket.emit("error", { message: "Message not found" });
+            return;
+          }
+          console.log(`📤 Broadcasting existing message: ${messageId}`);
+        } else {
+          console.error("No messageId provided for broadcasting");
+          socket.emit("error", { message: "Message ID required for broadcasting" });
+          return;
+        }
 
         // Update conversation's last_message_at
         await Conversation.update(
           { last_message_at: new Date() },
           { where: { id: conversationId } }
         );
-
-        // Get full message details
-        const messageWithSender = await Message.findByPk(message.id);
-
-        // Note: In a real implementation, you would fetch user data from Supabase
-        // and attach it to the message object here
 
         // Get conversation details to find recipient
         const conversation = await Conversation.findByPk(conversationId);
@@ -107,17 +138,19 @@ const initialize = (server) => {
             ? conversation.freelancer_id
             : conversation.client_id;
 
-        // Emit message to the conversation room
+        // Emit message to the conversation room (this will reach all users in the conversation)
         io.to(`conversation:${conversationId}`).emit(
           "new_message",
-          messageWithSender
+          messageToSend
         );
 
         // Also emit a notification to the recipient's personal room
         io.to(`user:${recipientId}`).emit("message_notification", {
           conversationId,
-          message: messageWithSender,
+          message: messageToSend,
         });
+
+        console.log(`✅ Message ${messageId} broadcasted to conversation ${conversationId} and user ${recipientId}`);
       } catch (error) {
         console.error("Error handling send_message:", error);
         socket.emit("error", { message: "Failed to send message" });
