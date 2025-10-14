@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Socket.io Test Client</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .panel {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+        }
+        h3 {
+            margin-top: 0;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .message-list {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+        .message {
+            padding: 8px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            max-width: 80%;
+        }
+        .message-sent {
+            background-color: #dcf8c6;
+            margin-left: auto;
+        }
+        .message-received {
+            background-color: #f1f0f0;
+        }
+        .event-log {
+            height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            font-family: monospace;
+            background-color: #f9f9f9;
+        }
+        .status {
+            margin-top: 10px;
+            padding: 5px;
+            border-radius: 4px;
+        }
+        .status.connected {
+            background-color: #dff0d8;
+            color: #3c763d;
+        }
+        .status.disconnected {
+            background-color: #f2dede;
+            color: #a94442;
+        }
+        .status-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        .dot-green {
+            background-color: #4CAF50;
+        }
+        .dot-red {
+            background-color: #f44336;
+        }
+        .dot-yellow {
+            background-color: #ffeb3b;
+        }
+        .typing-indicator {
+            color: #888;
+            font-style: italic;
+            height: 20px;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Socket.io Chat Test Client</h1>
+
+    <div class="panel">
+        <h3>Connection Setup</h3>
+        <div class="form-group">
+            <label for="serverUrl">Server URL:</label>
+            <input type="text" id="serverUrl" value="http://localhost:5000" />
+        </div>
+        <div class="form-group">
+            <label for="token">JWT Token:</label>
+            <input type="text" id="token" placeholder="Enter your JWT token" />
+        </div>
+        <button id="connectBtn">Connect</button>
+        <button id="disconnectBtn" disabled>Disconnect</button>
+        <div class="status disconnected">
+            <span class="status-dot dot-red"></span> Disconnected
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="panel">
+            <h3>Chat</h3>
+            <div class="form-group">
+                <label for="conversationId">Conversation ID:</label>
+                <input type="text" id="conversationId" placeholder="Enter conversation ID" />
+            </div>
+            <div class="typing-indicator" id="typingIndicator"></div>
+            <div class="message-list" id="messages"></div>
+            <div class="form-group">
+                <textarea id="messageContent" placeholder="Type your message..." rows="3"></textarea>
+            </div>
+            <div class="form-group">
+                <button id="sendBtn" disabled>Send Message</button>
+                <button id="markReadBtn" disabled>Mark Read</button>
+            </div>
+        </div>
+        <div class="panel">
+            <h3>Event Log</h3>
+            <div class="event-log" id="eventLog"></div>
+        </div>
+    </div>
+
+    <!-- Socket.io Client Library -->
+    <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
+    <script>
+        // DOM Elements
+        const serverUrlInput = document.getElementById('serverUrl');
+        const tokenInput = document.getElementById('token');
+        const conversationIdInput = document.getElementById('conversationId');
+        const messageContentInput = document.getElementById('messageContent');
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const sendBtn = document.getElementById('sendBtn');
+        const markReadBtn = document.getElementById('markReadBtn');
+        const messagesContainer = document.getElementById('messages');
+        const eventLog = document.getElementById('eventLog');
+        const statusDisplay = document.querySelector('.status');
+        const statusDot = document.querySelector('.status-dot');
+        const typingIndicator = document.getElementById('typingIndicator');
+
+        // Variables
+        let socket;
+        let typingTimeout;
+        let userId;
+
+        // Log events to the event log panel
+        function logEvent(event, data) {
+            const logEntry = document.createElement('div');
+            logEntry.innerHTML = `<strong>${new Date().toLocaleTimeString()}</strong> - ${event}`;
+            
+            if (data) {
+                logEntry.innerHTML += `: <pre>${JSON.stringify(data, null, 2)}</pre>`;
+            }
+            
+            eventLog.appendChild(logEntry);
+            eventLog.scrollTop = eventLog.scrollHeight;
+        }
+
+        // Update connection status display
+        function updateStatus(connected) {
+            if (connected) {
+                statusDisplay.className = 'status connected';
+                statusDisplay.innerHTML = '<span class="status-dot dot-green"></span> Connected';
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+                sendBtn.disabled = false;
+                markReadBtn.disabled = false;
+            } else {
+                statusDisplay.className = 'status disconnected';
+                statusDisplay.innerHTML = '<span class="status-dot dot-red"></span> Disconnected';
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+                sendBtn.disabled = true;
+                markReadBtn.disabled = true;
+                typingIndicator.textContent = '';
+            }
+        }
+
+        // Add message to the chat display
+        function addMessage(message, isSent) {
+            const messageElement = document.createElement('div');
+            messageElement.className = `message ${isSent ? 'message-sent' : 'message-received'}`;
+            messageElement.textContent = message.content || message;
+            messagesContainer.appendChild(messageElement);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        // Connect to Socket.io server
+        connectBtn.addEventListener('click', () => {
+            const serverUrl = serverUrlInput.value.trim();
+            const token = tokenInput.value.trim();
+            
+            if (!serverUrl || !token) {
+                alert('Server URL and token are required');
+                return;
+            }
+
+            try {
+                // Initialize Socket.io connection
+                socket = io(serverUrl, {
+                    auth: { token },
+                    transports: ['websocket', 'polling']
+                });
+
+                // Update UI to connecting state
+                statusDisplay.className = 'status';
+                statusDisplay.innerHTML = '<span class="status-dot dot-yellow"></span> Connecting...';
+
+                // Connection event handlers
+                socket.on('connect', () => {
+                    logEvent('Connected to server');
+                    updateStatus(true);
+                });
+
+                socket.on('disconnect', () => {
+                    logEvent('Disconnected from server');
+                    updateStatus(false);
+                });
+
+                socket.on('connect_error', (error) => {
+                    logEvent('Connection error', error.message);
+                    updateStatus(false);
+                });
+
+                // Chat event handlers
+                socket.on('new_message', (message) => {
+                    logEvent('Received new message', message);
+                    const isSent = message.sender_id === userId;
+                    addMessage(message, isSent);
+                });
+
+                socket.on('messages_read', (data) => {
+                    logEvent('Messages marked as read', data);
+                });
+
+                socket.on('typing', (data) => {
+                    logEvent('Typing indicator', data);
+                    if (data.isTyping) {
+                        typingIndicator.textContent = 'Someone is typing...';
+                    } else {
+                        typingIndicator.textContent = '';
+                    }
+                });
+
+                socket.on('error', (error) => {
+                    logEvent('Error', error);
+                    alert(`Error: ${error.message}`);
+                });
+
+                socket.on('message_notification', (data) => {
+                    logEvent('Message notification', data);
+                });
+
+                // Extract user ID from token (simplified)
+                try {
+                    const tokenParts = token.split('.');
+                    const payload = JSON.parse(atob(tokenParts[1]));
+                    userId = payload.id || payload.sub || payload.userId;
+                    logEvent('Extracted user ID', userId);
+                } catch (e) {
+                    logEvent('Failed to extract user ID from token', e.message);
+                }
+            } catch (error) {
+                logEvent('Error initializing socket', error.message);
+                alert(`Failed to initialize socket: ${error.message}`);
+            }
+        });
+
+        // Disconnect from server
+        disconnectBtn.addEventListener('click', () => {
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+                logEvent('Manually disconnected');
+            }
+        });
+
+        // Send a message
+        sendBtn.addEventListener('click', () => {
+            const conversationId = conversationIdInput.value.trim();
+            const content = messageContentInput.value.trim();
+            
+            if (!conversationId || !content) {
+                alert('Conversation ID and message content are required');
+                return;
+            }
+
+            if (socket) {
+                const messageData = {
+                    conversationId,
+                    content,
+                    messageType: 'text'
+                };
+
+                socket.emit('send_message', messageData);
+                logEvent('Sent message', messageData);
+                messageContentInput.value = '';
+
+                // Also send typing_end event
+                socket.emit('typing_end', { conversationId });
+            }
+        });
+
+        // Mark messages as read
+        markReadBtn.addEventListener('click', () => {
+            const conversationId = conversationIdInput.value.trim();
+            
+            if (!conversationId) {
+                alert('Conversation ID is required');
+                return;
+            }
+
+            if (socket) {
+                socket.emit('mark_read', { conversationId });
+                logEvent('Marked messages as read', { conversationId });
+            }
+        });
+
+        // Handle typing events
+        messageContentInput.addEventListener('input', () => {
+            const conversationId = conversationIdInput.value.trim();
+            if (!conversationId || !socket) return;
+
+            if (!typingTimeout) {
+                socket.emit('typing_start', { conversationId });
+                logEvent('Started typing', { conversationId });
+            }
+
+            clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => {
+                socket.emit('typing_end', { conversationId });
+                logEvent('Stopped typing', { conversationId });
+                typingTimeout = null;
+            }, 1000);
+        });
+    </script>
+</body>
+</html>
