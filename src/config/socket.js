@@ -32,14 +32,14 @@ const initialize = (server) => {
 
       // Verify token
       const decoded = jwt.verify(token, authConfig.jwtSecret);
-      socket.userId = decoded.sub;
+      socket.userId = decoded.id || decoded.sub;
 
       // Add the user to appropriate rooms
       const conversations = await Conversation.findAll({
         where: {
           [Op.or]: [
-            { client_id: decoded.userId },
-            { freelancer_id: decoded.userId },
+            { client_id: socket.userId },
+            { freelancer_id: socket.userId },
           ],
           is_active: true,
         },
