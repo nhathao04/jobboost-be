@@ -10,12 +10,12 @@ module.exports = (sequelize, DataTypes) => {
       client_id: {
         type: DataTypes.UUID,
         allowNull: false,
-        onDelete: "CASCADE",
+        // Loại bỏ ràng buộc khóa ngoại vì user được quản lý bởi Supabase
       },
       freelancer_id: {
         type: DataTypes.UUID,
         allowNull: false,
-        onDelete: "CASCADE",
+        // Loại bỏ ràng buộc khóa ngoại vì user được quản lý bởi Supabase
       },
       job_id: {
         type: DataTypes.UUID,
