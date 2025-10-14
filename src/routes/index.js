@@ -1,26 +1,34 @@
 const express = require("express");
-const authRoutes = require("./auth");
-const userRoutes = require("./users");
-const jobRoutes = require("./jobs");
-const applicationRoutes = require("./applications");
-const assignmentRoutes = require("./assignments");
-const reviewRoutes = require("./reviews");
-const paymentRoutes = require("./payments");
-const portfolioRoutes = require("./portfolio");
-const notificationRoutes = require("./notifications");
-const adminRoutes = require("./admin");
-
 const router = express.Router();
+const jobRoutes = require("./jobRoutes");
+const applicationRoutes = require("./applicationRoutes");
+const cvRoutes = require("./cv");
+const chatRoutes = require("./chatRoutes");
+const { authenticate } = require("../middleware/auth");
+// const categoryRoutes = require("./categoryRoutes");
 
-router.use("/auth", authRoutes);
-router.use("/users", userRoutes);
-router.use("/jobs", jobRoutes);
-router.use("/applications", applicationRoutes);
-router.use("/assignments", assignmentRoutes);
-router.use("/reviews", reviewRoutes);
-router.use("/payments", paymentRoutes);
-router.use("/portfolio", portfolioRoutes);
-router.use("/notifications", notificationRoutes);
-router.use("/admin", adminRoutes);
+// API Health Check
+router.get("/health", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "API is running",
+    timestamp: new Date(),
+  });
+});
+
+router.get("/auth-check", authenticate, (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "Auth middleware is working " + req.userId,
+    timestamp: new Date(),
+  });
+});
+
+// Mount routes
+router.use("/v1", jobRoutes);
+router.use("/v1", applicationRoutes);
+router.use("/v1", cvRoutes);
+router.use("/v1", chatRoutes);
+// router.use("/v1", categoryRoutes);
 
 module.exports = router;

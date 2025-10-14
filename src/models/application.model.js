@@ -10,65 +10,69 @@ module.exports = (sequelize, DataTypes) => {
       job_id: {
         type: DataTypes.UUID,
         allowNull: false,
-        references: {
-          model: "jobs",
-          key: "id",
-        },
-        onDelete: "CASCADE",
       },
-      student_id: {
+      applicant_id: {
         type: DataTypes.UUID,
         allowNull: false,
-        references: {
-          model: "student_profiles",
-          key: "id",
-        },
-        onDelete: "CASCADE",
       },
       cover_letter: {
         type: DataTypes.TEXT,
+        allowNull: true,
       },
       proposed_rate: {
-        type: DataTypes.DECIMAL(10, 2),
+        type: DataTypes.DECIMAL(15, 2),
+        allowNull: true,
       },
       proposed_timeline: {
-        type: DataTypes.INTEGER, // in days
+        type: DataTypes.INTEGER,
+        allowNull: true,
       },
       portfolio_links: {
-        type: DataTypes.ARRAY(DataTypes.TEXT),
+        type: DataTypes.ARRAY(DataTypes.STRING),
+        defaultValue: [],
       },
       status: {
-        type: DataTypes.ENUM("pending", "accepted", "rejected", "withdrawn"),
+        type: DataTypes.STRING,
         defaultValue: "pending",
+        validate: {
+          isIn: [["pending", "accepted", "rejected", "withdrawn"]],
+        },
       },
-      applied_at: {
-        type: DataTypes.DATE,
-        defaultValue: DataTypes.NOW,
+      employer_notes: {
+        type: DataTypes.TEXT,
+        allowNull: true,
       },
-      reviewed_at: {
-        type: DataTypes.DATE,
+      rejection_reason: {
+        type: DataTypes.TEXT,
+        allowNull: true,
       },
     },
     {
       tableName: "applications",
-      timestamps: false, // using custom applied_at field
+      timestamps: true,
       indexes: [
         {
           fields: ["job_id"],
         },
         {
-          fields: ["student_id"],
+          fields: ["applicant_id"],
         },
         {
           fields: ["status"],
         },
         {
           unique: true,
-          fields: ["job_id", "student_id"],
+          fields: ["job_id", "applicant_id"],
+          name: "applications_job_applicant_unique",
         },
       ],
     }
   );
+
+  // Define associations in the model index file
+  Application.associate = (models) => {
+    Application.belongsTo(models.Job, { foreignKey: "job_id", as: "job" });
+  };
 
   return Application;
 };

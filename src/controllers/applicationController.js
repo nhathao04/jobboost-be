@@ -1,130 +1,338 @@
-const { Application, Job, User, StudentProfile } = require("../models");
-const { handleError } = require("../utils/helpers");
+const { Application, Job, FreelancerProfile, CV, sequelize } = require("../models");
+const { Op } = require("sequelize");
 
-// Apply for a job
+// Apply for a job (Freelancer)
 exports.applyForJob = async (req, res) => {
   try {
     const { jobId } = req.params;
-    const {
-      student_id,
-      cover_letter,
-      proposed_rate,
-      proposed_timeline,
-      portfolio_links,
-    } = req.body;
+    const userId = req.userId; // From auth middleware
 
-    // Check if job exists
-    const job = await Job.findByPk(jobId);
-    if (!job) {
-      return res.status(404).json({ success: false, message: "Job not found" });
+    // If user haven't any CV, block apply
+    const cvCount = await CV.count({
+      where: { user_id: userId, status: 'active' }
+    });
+    if (cvCount === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "You must upload at least one active CV before applying for jobs",
+      });
     }
 
-    // Check if user already applied
+    const { cover_letter, proposed_rate, proposed_timeline, portfolio_links } =
+      req.body;
+
+    // Find the job
+    const job = await Job.findOne({
+      where: {
+        id: jobId,
+        status: "active", // Can only apply to active jobs
+      },
+    });
+
+    if (!job) {
+      return res.status(404).json({
+        success: false,
+        message: "Job not found or not available for applications",
+      });
+    }
+
+    // Check if user is not applying to their own job
+    if (job.owner_id === userId) {
+      return res.status(400).json({
+        success: false,
+        message: "You cannot apply to your own job",
+      });
+    }
+
+    // Check if already applied
     const existingApplication = await Application.findOne({
-      where: { job_id: jobId, student_id },
+      where: {
+        job_id: jobId,
+        applicant_id: userId,
+      },
     });
 
     if (existingApplication) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "You have already applied for this job",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "You have already applied for this job",
+      });
     }
 
+    // Create application
     const application = await Application.create({
       job_id: jobId,
-      student_id,
-      cover_letter,
-      proposed_rate,
-      proposed_timeline,
-      portfolio_links,
+      applicant_id: userId,
       status: "pending",
     });
 
-    res
-      .status(201)
-      .json({
-        success: true,
-        message: "Application submitted successfully",
-        data: application,
-      });
-  } catch (error) {
-    handleError(res, error);
-  }
-};
+    // Increment applications_count on job
+    await job.increment("applications_count");
 
-// Get applications for a job
-exports.getApplicationsForJob = async (req, res) => {
-  try {
-    const { jobId } = req.params;
-
-    const applications = await Application.findAll({
-      where: { job_id: jobId },
-      include: [
-        {
-          model: User,
-          as: "Student",
-          attributes: ["id", "full_name", "email", "avatar_url"],
-          include: [{ model: StudentProfile }],
-        },
-      ],
-      order: [["created_at", "DESC"]],
+    res.status(201).json({
+      success: true,
+      message: "Application submitted successfully",
+      data: application,
     });
-
-    res.status(200).json({ success: true, data: applications });
   } catch (error) {
-    handleError(res, error);
+    res.status(500).json({
+      success: false,
+      message: "An error occurred while submitting the application",
+      error: error.message,
+    });
   }
 };
 
-// Get applications by student
-exports.getApplicationsByStudent = async (req, res) => {
+// Get my applications (Freelancer)
+exports.getMyApplications = async (req, res) => {
   try {
-    const { studentId } = req.params;
+    const userId = req.userId; // From auth middleware
+    const { status, page = 1, limit = 10 } = req.query;
 
-    const applications = await Application.findAll({
-      where: { student_id: studentId },
+    // Build where clause
+    const where = {
+      applicant_id: userId,
+    };
+
+    // Filter by status if provided
+    if (status) where.status = status;
+
+    // Calculate pagination
+    const offset = (page - 1) * limit;
+
+    // Get applications
+    const { count, rows: applications } = await Application.findAndCountAll({
+      where,
       include: [
         {
           model: Job,
-          include: [
-            { model: User, as: "Employer", attributes: ["id", "full_name"] },
-          ],
+          as: "job",
         },
       ],
-      order: [["created_at", "DESC"]],
+      order: [["createdAt", "DESC"]],
+      limit,
+      offset,
     });
-
-    res.status(200).json({ success: true, data: applications });
-  } catch (error) {
-    handleError(res, error);
-  }
-};
-
-// Update application status
-exports.updateApplicationStatus = async (req, res) => {
-  try {
-    const { applicationId } = req.params;
-    const { status } = req.body;
-
-    const application = await Application.findByPk(applicationId);
-    if (!application) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Application not found" });
-    }
-
-    const updatedApplication = await application.update({ status });
 
     res.status(200).json({
       success: true,
-      message: "Application status updated",
-      data: updatedApplication,
+      data: applications,
+      pagination: {
+        total: count,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(count / limit),
+      },
     });
   } catch (error) {
-    handleError(res, error);
+    res.status(500).json({
+      success: false,
+      message: "An error occurred while getting the applications",
+      error: error.message,
+    });
+  }
+};
+
+// Withdraw application (Freelancer)
+exports.withdrawApplication = async (req, res) => {
+  try {
+    const { applicationId } = req.params;
+    const userId = req.userId; // From auth middleware
+
+    const application = await Application.findOne({
+      where: {
+        id: applicationId,
+        applicant_id: userId,
+      },
+    });
+
+    if (!application) {
+      return res.status(404).json({
+        success: false,
+        message:
+          "Application not found or you do not have permission to withdraw it",
+      });
+    }
+
+    // Check if application can be withdrawn (only pending applications)
+    if (application.status !== "pending") {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot withdraw application with status '${application.status}'`,
+      });
+    }
+
+    // Update application status to withdrawn
+    await application.update({ status: "WITHDRAWN" });
+
+    res.status(200).json({
+      success: true,
+      message: "Application withdrawn successfully",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "An error occurred while withdrawing the application",
+      error: error.message,
+    });
+  }
+};
+
+// Get applications for a job (Employer)
+exports.getApplicationsForJob = async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const userId = req.userId; // From auth middleware
+
+    // Find the job to check ownership
+    const job = await Job.findOne({
+      where: { id: jobId },
+    });
+
+    if (!job) {
+      return res.status(404).json({
+        success: false,
+        message: "Job not found",
+      });
+    }
+
+    // Check if user is the job owner
+    if (job.owner_id !== userId && !req.user.is_admin) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to view applications for this job",
+      });
+    }
+
+    // Get applications with pagination
+    const { page = 1, limit = 10, status } = req.query;
+    const offset = (page - 1) * limit;
+
+    // Build where clause
+    const where = { job_id: jobId };
+    if (status) where.status = status;
+
+    // Get applications
+    const { count, rows: applications } = await Application.findAndCountAll({
+      where,
+      order: [["createdAt", "DESC"]],
+      limit,
+      offset,
+    });
+
+    res.status(200).json({
+      success: true,
+      data: applications,
+      pagination: {
+        total: count,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(count / limit),
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "An error occurred while getting the applications",
+      error: error.message,
+    });
+  }
+};
+
+// Update application status (Employer)
+exports.updateApplicationStatus = async (req, res) => {
+  try {
+    const { applicationId } = req.params;
+    const { status, employer_notes } = req.body;
+    const userId = req.userId; // From auth middleware
+
+    // Validate status
+    if (!["accepted", "rejected"].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Status must be 'ACCEPTED' or 'REJECTED'",
+      });
+    }
+
+    // Find application
+    const application = await Application.findByPk(applicationId, {
+      include: [{ model: Job, as: "job" }],
+    });
+
+    if (!application) {
+      return res.status(404).json({
+        success: false,
+        message: "Application not found",
+      });
+    }
+
+    // Check if user is the job owner
+    if (application.job.owner_id !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to update this application",
+      });
+    }
+
+    // Update application
+    await application.update({
+      status,
+      employer_notes: employer_notes || application.employer_notes,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Application ${status} successfully`,
+      data: application,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "An error occurred while updating the application status",
+      error: error.message,
+    });
+  }
+};
+
+// Get application details
+exports.getApplicationDetail = async (req, res) => {
+  try {
+    const { applicationId } = req.params;
+    const userId = req.userId; // From auth middleware
+
+    const application = await Application.findByPk(applicationId, {
+      include: [{ model: Job, as: "job" }],
+    });
+
+    if (!application) {
+      return res.status(404).json({
+        success: false,
+        message: "Application not found",
+      });
+    }
+
+    // Check if user is authorized (either the applicant or the job owner)
+    if (
+      application.applicant_id !== userId &&
+      application.job.owner_id !== userId &&
+      !req.user.is_admin
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to view this application",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: application,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "An error occurred while getting the application details",
+      error: error.message,
+    });
   }
 };
 
@@ -137,15 +345,11 @@ exports.getApplicationById = async (req, res) => {
       include: [
         {
           model: Job,
-          include: [
-            { model: User, as: "Employer", attributes: ["id", "full_name"] },
-          ],
         },
         {
           model: User,
           as: "Student",
           attributes: ["id", "full_name", "email", "avatar_url"],
-          include: [{ model: StudentProfile }],
         },
       ],
     });
@@ -158,7 +362,11 @@ exports.getApplicationById = async (req, res) => {
 
     res.status(200).json({ success: true, data: application });
   } catch (error) {
-    handleError(res, error);
+    return res.status(500).json({
+      success: false,
+      message: "An error occurred while getting the application",
+      error: error.message,
+    });
   }
 };
 
@@ -180,6 +388,10 @@ exports.deleteApplication = async (req, res) => {
       .status(200)
       .json({ success: true, message: "Application deleted successfully" });
   } catch (error) {
-    handleError(res, error);
+    return res.status(500).json({
+      success: false,
+      message: "An error occurred while deleting the application",
+      error: error.message,
+    });
   }
 };

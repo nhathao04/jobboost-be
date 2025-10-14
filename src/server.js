@@ -1,7 +1,9 @@
 const express = require("express");
-const { sequelize, testConnection } = require("./config/database");
+const http = require("http");
+const { sequelize, testConnection } = require("./config/sequelize");
 const config = require("./config");
 const app = require("./app");
+const socketIO = require("./config/socket");
 
 // Import models to initialize them
 require("./models");
@@ -14,9 +16,9 @@ const initializeDatabase = async () => {
     // Test database connection
     await testConnection();
 
-    // Sync database models (create tables if they don't exist)
-    await sequelize.sync({ force: false }); // set force: true to drop and recreate tables
-    console.log("✅ Database models synchronized successfully");
+    // Skip syncing since we don't have CREATE TABLE permission
+    // The tables should already exist in the remote database
+    console.log("✅ Database connection established successfully");
   } catch (error) {
     console.error("❌ Database initialization failed:", error);
     process.exit(1);
@@ -28,8 +30,16 @@ const startServer = async () => {
   try {
     await initializeDatabase();
 
-    app.listen(PORT, () => {
+    // Create HTTP server
+    const server = http.createServer(app);
+
+    // Initialize Socket.io
+    socketIO.initialize(server);
+
+    // Start server
+    server.listen(PORT, () => {
       console.log(`🚀 Server is running on http://localhost:${PORT}`);
+      console.log(`🔌 Socket.IO server is running`);
     });
   } catch (error) {
     console.error("❌ Server startup failed:", error);
