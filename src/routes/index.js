@@ -3,6 +3,7 @@ const router = express.Router();
 const jobRoutes = require("./jobRoutes");
 const applicationRoutes = require("./applicationRoutes");
 const cvRoutes = require("./cv");
+const chatRoutes = require("./chatRoutes");
 const { authenticate } = require("../middleware/auth");
 // const categoryRoutes = require("./categoryRoutes");
 
@@ -27,6 +28,7 @@ router.get("/auth-check", authenticate, (req, res) => {
 router.use("/v1", jobRoutes);
 router.use("/v1", applicationRoutes);
 router.use("/v1", cvRoutes);
+router.use("/v1", chatRoutes);
 // router.use("/v1", categoryRoutes);
 
 module.exports = router;

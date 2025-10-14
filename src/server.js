@@ -1,7 +1,9 @@
 const express = require("express");
+const http = require("http");
 const { sequelize, testConnection } = require("./config/sequelize");
 const config = require("./config");
 const app = require("./app");
+const socketIO = require("./config/socket");
 
 // Import models to initialize them
 require("./models");
@@ -28,8 +30,16 @@ const startServer = async () => {
   try {
     await initializeDatabase();
 
-    app.listen(PORT, () => {
+    // Create HTTP server
+    const server = http.createServer(app);
+
+    // Initialize Socket.io
+    socketIO.initialize(server);
+
+    // Start server
+    server.listen(PORT, () => {
       console.log(`🚀 Server is running on http://localhost:${PORT}`);
+      console.log(`🔌 Socket.IO server is running`);
     });
   } catch (error) {
     console.error("❌ Server startup failed:", error);
