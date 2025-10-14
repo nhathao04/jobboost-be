@@ -24,9 +24,11 @@ const initialize = (server) => {
     try {
       const token =
         socket.handshake.auth.token ||
+        socket.handshake.query.token ||
         socket.handshake.headers.authorization?.split(" ")[1];
 
       if (!token) {
+        console.log("❌ No authentication token provided");
         return next(new Error("Authentication token is required"));
       }
 
@@ -37,28 +39,80 @@ const initialize = (server) => {
         // First, try to verify with our backend JWT secret
         decoded = jwt.verify(token, authConfig.jwtSecret);
         userId = decoded.id || decoded.sub;
-        console.log("✅ Backend JWT token verified:", { userId, tokenType: 'backend' });
+        console.log("✅ Backend JWT token verified:", {
+          userId,
+          tokenType: "backend",
+        });
       } catch (backendError) {
+        console.log(
+          "🔄 Backend JWT verification failed, trying Supabase token..."
+        );
         try {
-          // If backend JWT fails, try Supabase JWT (no verification for now, just decode)
-          decoded = jwt.decode(token);
-          if (decoded && (decoded.sub || decoded.id)) {
-            userId = decoded.sub || decoded.id;
-            console.log("✅ Supabase JWT token decoded:", { userId, tokenType: 'supabase' });
-
-            // Additional validation for Supabase tokens
-            if (!decoded.aud || !decoded.exp || decoded.exp < Math.floor(Date.now() / 1000)) {
-              throw new Error("Invalid or expired Supabase token");
-            }
-          } else {
-            throw new Error("Invalid token format");
+          // For Supabase tokens, decode without verification first to get issuer info
+          const decodedHeader = jwt.decode(token, { complete: true });
+          if (!decodedHeader) {
+            throw new Error("Cannot decode token header");
           }
+
+          decoded = jwt.decode(token);
+          console.log("🔍 Decoded Supabase token payload:", {
+            hasDecoded: !!decoded,
+            sub: decoded?.sub,
+            id: decoded?.id,
+            aud: decoded?.aud,
+            exp: decoded?.exp,
+            iss: decoded?.iss,
+            role: decoded?.role,
+            currentTime: Math.floor(Date.now() / 1000),
+            isExpired: decoded?.exp
+              ? decoded.exp < Math.floor(Date.now() / 1000)
+              : "no exp field",
+            allKeys: decoded ? Object.keys(decoded) : [],
+          });
+
+          if (!decoded || (!decoded.sub && !decoded.id)) {
+            throw new Error("No user ID found in token");
+          }
+
+          userId = decoded.sub || decoded.id;
+
+          // Basic validation for Supabase tokens
+          if (decoded.exp && decoded.exp < Math.floor(Date.now() / 1000)) {
+            console.log("❌ Supabase token is expired");
+            throw new Error("Token expired");
+          }
+
+          // Check if it's a Supabase token by looking for typical Supabase fields
+          if (decoded.iss && decoded.iss.includes("supabase")) {
+            console.log(
+              "✅ Detected Supabase token, skipping signature verification"
+            );
+          } else if (
+            decoded.aud &&
+            (decoded.aud.includes("authenticated") ||
+              decoded.aud === "authenticated")
+          ) {
+            console.log("✅ Detected Supabase token by audience field");
+          } else {
+            console.log(
+              "⚠️ Unknown token format, proceeding with basic validation"
+            );
+          }
+
+          console.log("✅ Supabase JWT token accepted:", {
+            userId,
+            tokenType: "supabase",
+          });
         } catch (supabaseError) {
           console.error("❌ Both JWT verification methods failed:", {
             backendError: backendError.message,
-            supabaseError: supabaseError.message
+            supabaseError: supabaseError.message,
+            tokenPreview: token.substring(0, 50) + "...",
+            tokenLength: token.length,
           });
-          return next(new Error("Invalid authentication token"));
+          return next(
+            new Error("Authentication failed - token invalid or expired")
+          );
         }
       }
 
@@ -76,7 +130,9 @@ const initialize = (server) => {
       });
 
       socket.conversations = conversations.map((conv) => conv.id);
-      console.log(`👤 User ${socket.userId} authenticated with ${socket.conversations.length} conversations`);
+      console.log(
+        `👤 User ${socket.userId} authenticated with ${socket.conversations.length} conversations`
+      );
       next();
     } catch (error) {
       console.error("Socket authentication error:", error);
@@ -99,7 +155,13 @@ const initialize = (server) => {
     // Handle new message event - BROADCASTING ONLY (message already persisted via REST API)
     socket.on("send_message", async (data) => {
       try {
-        const { conversationId, content, messageType = "text", fileUrl, messageId } = data;
+        const {
+          conversationId,
+          content,
+          messageType = "text",
+          fileUrl,
+          messageId,
+        } = data;
 
         // Verify user is part of this conversation
         if (!socket.conversations.includes(conversationId)) {
@@ -121,7 +183,9 @@ const initialize = (server) => {
           console.log(`📤 Broadcasting existing message: ${messageId}`);
         } else {
           console.error("No messageId provided for broadcasting");
-          socket.emit("error", { message: "Message ID required for broadcasting" });
+          socket.emit("error", {
+            message: "Message ID required for broadcasting",
+          });
           return;
         }
 
@@ -150,7 +214,9 @@ const initialize = (server) => {
           message: messageToSend,
         });
 
-        console.log(`✅ Message ${messageId} broadcasted to conversation ${conversationId} and user ${recipientId}`);
+        console.log(
+          `✅ Message ${messageId} broadcasted to conversation ${conversationId} and user ${recipientId}`
+        );
       } catch (error) {
         console.error("Error handling send_message:", error);
         socket.emit("error", { message: "Failed to send message" });
