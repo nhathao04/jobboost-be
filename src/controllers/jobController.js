@@ -30,7 +30,7 @@ exports.createJob = async (req, res) => {
       });
     }
 
-    console.log(userId)
+    console.log(userId);
     // Create job
     const job = await Job.create({
       owner_id: userId,
@@ -82,9 +82,8 @@ exports.getAllJobs = async (req, res) => {
     } = req.query;
 
     const where = {
-      status: "active", 
+      status: "active",
     };
-
 
     if (job_type) where.job_type = job_type;
     if (experience_level) where.experience_level = experience_level;
@@ -138,7 +137,7 @@ exports.getJobById = async (req, res) => {
   try {
     const { jobId } = req.params;
 
-    console.log(jobId)
+    console.log(jobId);
 
     const job = await Job.findOne({
       where: {
@@ -294,7 +293,7 @@ exports.getMyJobs = async (req, res) => {
   try {
     const userId = req.userId; // From auth middleware
     const { status, page = 1, limit = 10 } = req.query;
-    console.log('userID: ', userId);
+    console.log("userID: ", userId);
     // Build where clause
     const where = {
       owner_id: userId,
@@ -382,7 +381,8 @@ exports.reviewJob = async (req, res) => {
 // Admin: Get jobs pending approval
 exports.getPendingJobs = async (req, res) => {
   try {
-    const { page, limit } = req.query;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
 
     // Get pending jobs
@@ -393,6 +393,7 @@ exports.getPendingJobs = async (req, res) => {
       limit,
       offset,
     });
+    console.log(1);
 
     res.status(200).json({
       success: true,
