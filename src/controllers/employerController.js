@@ -155,7 +155,11 @@ exports.registerEmployer = async (req, res) => {
     }
   } catch (error) {
     console.error("Error registering employer:", error);
-    return handleError(res, error, "Failed to register employer profile");
+       return res.status(500).json({
+            success: false,
+            message: "Error registering employer profile",
+            error: error.message,
+          });
   }
 };
 
@@ -191,8 +195,11 @@ exports.getEmployerProfile = async (req, res) => {
       updated_at: employerProfile.updatedAt,
     });
   } catch (error) {
-    console.error("Error fetching employer profile:", error);
-    return handleError(res, error, "Failed to fetch employer profile");
+       return res.status(500).json({
+         success: false,
+         message: "Error fetching employer profile",
+         error: error.message,
+       });
   }
 };
 
@@ -300,7 +307,11 @@ exports.updateEmployerProfile = async (req, res) => {
     });
   } catch (error) {
     console.error("Error updating employer profile:", error);
-    return handleError(res, error, "Failed to update employer profile");
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update employer profile",
+      error: error.message,
+    });
   }
 };
 
@@ -345,7 +356,11 @@ exports.getVerifiedEmployers = async (req, res) => {
     });
   } catch (error) {
     console.error("Error fetching verified employers:", error);
-    return handleError(res, error, "Failed to fetch verified employers");
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch verified employers",
+      error: error.message,
+    });
   }
 };
 
@@ -381,6 +396,10 @@ exports.verifyEmployer = async (req, res) => {
     });
   } catch (error) {
     console.error("Error verifying employer:", error);
-    return handleError(res, error, "Failed to verify employer");
+    return res.status(500).json({
+      success: false,
+      message: "Failed to verify employer",
+      error: error.message,
+    });
   }
 };
