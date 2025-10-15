@@ -27,7 +27,7 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING,
         allowNull: false,
         validate: {
-          isIn: [["PROJECT", "FREELANCE", "PART_TIME"]],
+          isIn: [["FULL_TIME", "PROJECT", "FREELANCE", "PART_TIME"]],
         },
       },
       budget_type: {
