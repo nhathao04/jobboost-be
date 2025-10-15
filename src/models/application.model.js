@@ -72,6 +72,10 @@ module.exports = (sequelize, DataTypes) => {
   // Define associations in the model index file
   Application.associate = (models) => {
     Application.belongsTo(models.Job, { foreignKey: "job_id", as: "job" });
+    Application.belongsTo(models.FreelancerProfile, {
+      targetKey: "user_id",
+      as: "freelancer",
+    });
   };
 
   return Application;

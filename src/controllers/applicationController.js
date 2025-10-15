@@ -1,5 +1,12 @@
 const { Application, Job, FreelancerProfile, CV, sequelize } = require("../models");
 const { Op } = require("sequelize");
+const { createClient } = require("@supabase/supabase-js");
+
+// Initialize Supabase client (if configured)
+let supabase = null;
+if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+}
 
 // Apply for a job (Freelancer)
 exports.applyForJob = async (req, res) => {
@@ -212,7 +219,7 @@ exports.getApplicationsForJob = async (req, res) => {
     const where = { job_id: jobId };
     if (status) where.status = status;
 
-    // Get applications
+    // Get applications with user info
     const { count, rows: applications } = await Application.findAndCountAll({
       where,
       order: [["createdAt", "DESC"]],
@@ -220,9 +227,64 @@ exports.getApplicationsForJob = async (req, res) => {
       offset,
     });
 
+    // For each application, get user info from Supabase and CV
+    const applicationsWithUser = await Promise.all(
+      applications.map(async (app) => {
+        const appData = app.toJSON();
+        
+        // Get primary CV for this applicant
+        const primaryCV = await CV.findOne({
+          where: {
+            user_id: appData.applicant_id,
+            status: 'active'
+          },
+          attributes: ['id', 'name', 'file_name', 'file_path']
+        });
+
+        console.log(primaryCV);
+
+        // Get user info from Supabase
+        let fullName = null;
+        if (supabase) {
+          try {
+            const { data: userData, error } = await supabase.auth.admin.getUserById(
+              appData.applicant_id
+            );
+            
+            if (!error && userData?.user) {
+              // Try to get full_name from user_metadata or raw_user_meta_data
+              fullName = 
+                userData.user.user_metadata?.full_name || 
+                userData.user.user_metadata?.name ||
+                userData.user.raw_user_meta_data?.full_name ||
+                userData.user.raw_user_meta_data?.name ||
+                userData.user.email?.split('@')[0] || // Fallback to email username
+                null;
+            }
+          } catch (supabaseError) {
+            console.error('Error fetching user from Supabase:', supabaseError);
+            // Continue without user data
+          }
+        }
+
+        // Add user object with full_name and cv
+        return {
+          ...appData,
+          user: {
+            full_name: fullName,
+            cv: primaryCV ? {
+              id: primaryCV.id,
+              name: primaryCV.name,
+              file_name: primaryCV.file_name
+            } : null
+          }
+        };
+      })
+    );
+
     res.status(200).json({
       success: true,
-      data: applications,
+      data: applicationsWithUser,
       pagination: {
         total: count,
         page: parseInt(page),

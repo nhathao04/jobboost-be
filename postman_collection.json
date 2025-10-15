@@ -1,0 +1,581 @@
+{
+  "info": {
+    "name": "JobBoost Backend API",
+    "description": "Complete API collection for JobBoost platform",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{JWT_TOKEN}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "BASE_URL",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "JWT_TOKEN",
+      "value": "your_jwt_token_here",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Employer APIs",
+      "item": [
+        {
+          "name": "Register Employer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"company_name\": \"TechCorp Inc.\",\n  \"company_website\": \"https://techcorp.com\",\n  \"company_logo\": \"https://example.com/logo.png\",\n  \"company_description\": \"Leading tech company in Vietnam\",\n  \"industry\": \"Technology\",\n  \"company_size\": \"51-200\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/employer/register",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "employer", "register"]
+            }
+          }
+        },
+        {
+          "name": "Get Employer Profile",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{BASE_URL}}/api/employer/profile",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "employer", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Update Employer Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"company_name\": \"Updated Company Name\",\n  \"company_description\": \"Updated description\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/employer/profile",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "employer", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Get Verified Employers (Public)",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/employers?page=1&limit=10",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "employers"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Job APIs",
+      "item": [
+        {
+          "name": "Get All Jobs (Public)",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/jobs?page=1&limit=10",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "jobs"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Job by ID",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/jobs/:jobId",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "jobs", ":jobId"],
+              "variable": [
+                {
+                  "key": "jobId",
+                  "value": "job-uuid-here"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Job",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Full Stack Developer Needed\",\n  \"description\": \"We are looking for an experienced developer...\",\n  \"job_type\": \"FREELANCE\",\n  \"budget_type\": \"FIXED\",\n  \"budget_min\": 5000000,\n  \"budget_max\": 10000000,\n  \"currency\": \"VND\",\n  \"experience_level\": \"INTERMEDIATE\",\n  \"deadline\": \"2025-11-15\",\n  \"skills_required\": [\"React\", \"Node.js\", \"PostgreSQL\"]\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/jobs",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "jobs"]
+            }
+          }
+        },
+        {
+          "name": "Update Job",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated Job Title\",\n  \"budget_min\": 6000000\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/jobs/:jobId",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "jobs", ":jobId"],
+              "variable": [
+                {
+                  "key": "jobId",
+                  "value": "job-uuid-here"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Job",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/jobs/:jobId",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "jobs", ":jobId"],
+              "variable": [
+                {
+                  "key": "jobId",
+                  "value": "job-uuid-here"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get My Jobs",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/jobs/my-jobs",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "jobs", "my-jobs"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Application APIs",
+      "item": [
+        {
+          "name": "Apply for Job",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cover_letter\": \"I am interested in this position...\",\n  \"proposed_rate\": 8000000,\n  \"proposed_duration\": \"2 weeks\",\n  \"availability_start\": \"2025-10-20\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/applications/:jobId",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "applications", ":jobId"],
+              "variable": [
+                {
+                  "key": "jobId",
+                  "value": "job-uuid-here"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get My Applications",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/applications?page=1&limit=10",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "applications"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Application Detail",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/applications/:applicationId",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "applications", ":applicationId"],
+              "variable": [
+                {
+                  "key": "applicationId",
+                  "value": "application-uuid-here"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Withdraw Application",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/applications/:applicationId/withdraw",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "applications", ":applicationId", "withdraw"],
+              "variable": [
+                {
+                  "key": "applicationId",
+                  "value": "application-uuid-here"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Application Status (Employer)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"accepted\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/applications/:applicationId/status",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "applications", ":applicationId", "status"],
+              "variable": [
+                {
+                  "key": "applicationId",
+                  "value": "application-uuid-here"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "CV Management APIs",
+      "item": [
+        {
+          "name": "Upload CV",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "cv",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "name",
+                  "value": "My Resume 2025",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "Updated CV",
+                  "type": "text"
+                },
+                {
+                  "key": "isPrimary",
+                  "value": "true",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/cvs",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "cvs"]
+            }
+          }
+        },
+        {
+          "name": "Get My CVs",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/cvs?page=1&limit=10",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "cvs"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get CV by ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/cvs/:id",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "cvs", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "cv-uuid-here"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update CV",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Resume Name\",\n  \"description\": \"New description\",\n  \"isPrimary\": true\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/cvs/:id",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "cvs", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "cv-uuid-here"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete CV",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/cvs/:id",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "cvs", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "cv-uuid-here"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Download CV",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/cvs/:id/download",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "cvs", ":id", "download"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "cv-uuid-here"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Set Primary CV",
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/cvs/:id/set-primary",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "cvs", ":id", "set-primary"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "cv-uuid-here"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin APIs",
+      "item": [
+        {
+          "name": "Get Pending Jobs",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/admin/jobs/pending",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "admin", "jobs", "pending"]
+            }
+          }
+        },
+        {
+          "name": "Review Job",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/admin/jobs/:jobId/review",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "admin", "jobs", ":jobId", "review"],
+              "variable": [
+                {
+                  "key": "jobId",
+                  "value": "job-uuid-here"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Verify Employer",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"is_verified\": true\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/admin/employers/:id/verify",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "admin", "employers", ":id", "verify"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "employer-uuid-here"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -30,6 +30,7 @@ exports.createJob = async (req, res) => {
       });
     }
 
+    console.log(userId)
     // Create job
     const job = await Job.create({
       owner_id: userId,
@@ -293,7 +294,7 @@ exports.getMyJobs = async (req, res) => {
   try {
     const userId = req.userId; // From auth middleware
     const { status, page = 1, limit = 10 } = req.query;
-
+    console.log('userID: ', userId);
     // Build where clause
     const where = {
       owner_id: userId,
@@ -308,7 +309,6 @@ exports.getMyJobs = async (req, res) => {
     // Get jobs
     const { count, rows: jobs } = await Job.findAndCountAll({
       where,
-      include: [{ model: Category, as: "category" }],
       order: [["created_at", "DESC"]],
       limit,
       offset,
