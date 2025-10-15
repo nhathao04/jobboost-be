@@ -330,13 +330,6 @@ exports.downloadCV = async (req, res) => {
       }
     });
 
-    if (!cv) {
-      return res.status(404).json({
-        success: false,
-        message: "CV not found"
-      });
-    }
-
     // Check if file exists
     if (!fs.existsSync(cv.file_path)) {
       return res.status(404).json({
