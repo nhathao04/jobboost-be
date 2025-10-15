@@ -319,13 +319,11 @@ exports.deleteCV = async (req, res) => {
 // Download CV file
 exports.downloadCV = async (req, res) => {
   try {
-    const userId = req.userId; // Replace with actual auth middleware value
     const { id } = req.params;
 
     const cv = await CV.findOne({
       where: {
         id,
-        user_id: userId,
         status: 'active'
       }
     });
