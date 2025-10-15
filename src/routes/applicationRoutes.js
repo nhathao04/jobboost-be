@@ -21,11 +21,11 @@ router.put(
 );
 
 // Client (employer) routes
-// router.get(
-//   "/jobs/:jobId/applications",
-//   authenticate,
-//   applicationController.getApplicationsForJob
-// );
+router.get(
+  "/jobs/:jobId/applications",
+  authenticate,
+  applicationController.getApplicationsForJob
+);
 router.put(
   "/applications/:applicationId/status",
   authenticate,
