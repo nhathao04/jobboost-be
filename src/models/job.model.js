@@ -80,6 +80,11 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.ARRAY(DataTypes.STRING),
         defaultValue: [],
       },
+      post_cost: {
+        type: DataTypes.DECIMAL(15, 2),
+        defaultValue: 0,
+        comment: "Chi phí đăng tin tuyển dụng",
+      },
       rejection_reason: {
         type: DataTypes.TEXT,
         allowNull: true,

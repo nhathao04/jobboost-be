@@ -1,8 +1,11 @@
 const { Job, Application, sequelize } = require("../models");
 const { Op } = require("sequelize");
+const walletController = require("./walletController");
 
 // Create a new job posting (Client/Employer)
 exports.createJob = async (req, res) => {
+  const transaction = await sequelize.transaction();
+
   try {
     // Get user from auth middleware
     const userId = req.userId; // Assuming Supabase auth middleware sets this
@@ -20,41 +23,89 @@ exports.createJob = async (req, res) => {
       experience_level,
       deadline,
       skills_required,
+      post_cost, // Giá tiền đăng bài
     } = req.body;
 
     // Basic validation
     if (!title || !description || !job_type || !budget_type) {
+      await transaction.rollback();
       return res.status(400).json({
         success: false,
         message: "Missing required fields",
       });
     }
 
+    // Validate post_cost
+    if (!post_cost || post_cost <= 0) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "Post cost is required and must be greater than 0",
+      });
+    }
+
     console.log(userId);
+
+    // Trừ tiền từ ví trước khi tạo job
+    let walletResult;
+    try {
+      walletResult = await walletController.deductMoneyForJobPost(
+        userId,
+        post_cost,
+        null, // jobId sẽ được cập nhật sau khi tạo job
+        transaction
+      );
+    } catch (walletError) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: walletError.message,
+        error: "WALLET_ERROR",
+      });
+    }
+
     // Create job
-    const job = await Job.create({
-      owner_id: userId,
-      title,
-      description,
-      // category_id không tồn tại trong database
-      // category_id,
-      job_type,
-      budget_type,
-      budget_min,
-      budget_max,
-      currency,
-      experience_level,
-      deadline: deadline ? new Date(deadline) : null,
-      skills_required: skills_required || [],
-      status: "pending", // Jobs need admin approval by default
-    });
+    const job = await Job.create(
+      {
+        owner_id: userId,
+        title,
+        description,
+        // category_id không tồn tại trong database
+        // category_id,
+        job_type,
+        budget_type,
+        budget_min,
+        budget_max,
+        currency,
+        experience_level,
+        deadline: deadline ? new Date(deadline) : null,
+        skills_required: skills_required || [],
+        post_cost, // Lưu chi phí đăng bài
+        status: "pending", // Jobs need admin approval by default
+      },
+      { transaction }
+    );
+
+    // Cập nhật reference_id trong transaction
+    await walletResult.transaction.update(
+      { reference_id: job.id },
+      { transaction }
+    );
+
+    await transaction.commit();
 
     res.status(201).json({
       success: true,
-      message: "Job created successfully and awaiting approval",
-      data: job,
+      message:
+        "Job created successfully and awaiting approval. Money deducted from wallet.",
+      data: {
+        job,
+        wallet_balance: walletResult.balance_after,
+        amount_deducted: post_cost,
+      },
     });
   } catch (error) {
+    await transaction.rollback();
     res.status(500).json({
       success: false,
       message: "An error occurred while creating the job",

@@ -1,7 +1,10 @@
-const { EmployerProfile, sequelize } = require("../models");
+const { EmployerProfile, Wallet, sequelize } = require("../models");
 const { handleError } = require("../utils/helpers");
 const { createClient } = require("@supabase/supabase-js");
 const { env } = require("../config/env");
+
+// Số dư mặc định khi tạo ví
+const DEFAULT_WALLET_BALANCE = 0; // 1,000,000 VND
 
 // Initialize Supabase client for admin operations (if configured)
 let supabase = null;
@@ -12,7 +15,9 @@ if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
   );
   console.log("✅ Supabase client initialized for user role management");
 } else {
-  console.warn("⚠️ Supabase credentials not found. User role updates will be skipped.");
+  console.warn(
+    "⚠️ Supabase credentials not found. User role updates will be skipped."
+  );
 }
 
 /**
@@ -41,7 +46,14 @@ exports.registerEmployer = async (req, res) => {
     }
 
     // Validate company_size if provided
-    const validSizes = ["1-10", "11-50", "51-200", "201-500", "501-1000", "1000+"];
+    const validSizes = [
+      "1-10",
+      "11-50",
+      "51-200",
+      "201-500",
+      "501-1000",
+      "1000+",
+    ];
     if (company_size && !validSizes.includes(company_size)) {
       return res.status(400).json({
         error: "Validation error",
@@ -125,7 +137,9 @@ exports.registerEmployer = async (req, res) => {
           if (error) {
             console.error("Error updating user metadata in Supabase:", error);
             // Don't fail the transaction, just log the error
-            console.warn("⚠️ Could not update user role in Supabase, but profile was created");
+            console.warn(
+              "⚠️ Could not update user role in Supabase, but profile was created"
+            );
           } else {
             console.log("✅ User role updated to employer in Supabase");
           }
@@ -134,7 +148,9 @@ exports.registerEmployer = async (req, res) => {
           // Continue anyway - profile is created
         }
       } else {
-        console.warn("⚠️ Skipping Supabase role update - Supabase not configured");
+        console.warn(
+          "⚠️ Skipping Supabase role update - Supabase not configured"
+        );
       }
 
       await transaction.commit();
@@ -155,11 +171,11 @@ exports.registerEmployer = async (req, res) => {
     }
   } catch (error) {
     console.error("Error registering employer:", error);
-       return res.status(500).json({
-            success: false,
-            message: "Error registering employer profile",
-            error: error.message,
-          });
+    return res.status(500).json({
+      success: false,
+      message: "Error registering employer profile",
+      error: error.message,
+    });
   }
 };
 
@@ -195,11 +211,11 @@ exports.getEmployerProfile = async (req, res) => {
       updated_at: employerProfile.updatedAt,
     });
   } catch (error) {
-       return res.status(500).json({
-         success: false,
-         message: "Error fetching employer profile",
-         error: error.message,
-       });
+    return res.status(500).json({
+      success: false,
+      message: "Error fetching employer profile",
+      error: error.message,
+    });
   }
 };
 
@@ -240,7 +256,14 @@ exports.updateEmployerProfile = async (req, res) => {
     }
 
     // Validate company_size if provided
-    const validSizes = ["1-10", "11-50", "51-200", "201-500", "501-1000", "1000+"];
+    const validSizes = [
+      "1-10",
+      "11-50",
+      "51-200",
+      "201-500",
+      "501-1000",
+      "1000+",
+    ];
     if (company_size && !validSizes.includes(company_size)) {
       return res.status(400).json({
         error: "Validation error",
@@ -282,11 +305,24 @@ exports.updateEmployerProfile = async (req, res) => {
     // Update profile
     await employerProfile.update({
       company_name: company_name?.trim() || employerProfile.company_name,
-      company_website: company_website !== undefined ? company_website : employerProfile.company_website,
-      company_logo: company_logo !== undefined ? company_logo : employerProfile.company_logo,
-      company_description: company_description !== undefined ? company_description?.trim() : employerProfile.company_description,
-      industry: industry !== undefined ? industry?.trim() : employerProfile.industry,
-      company_size: company_size !== undefined ? company_size : employerProfile.company_size,
+      company_website:
+        company_website !== undefined
+          ? company_website
+          : employerProfile.company_website,
+      company_logo:
+        company_logo !== undefined
+          ? company_logo
+          : employerProfile.company_logo,
+      company_description:
+        company_description !== undefined
+          ? company_description?.trim()
+          : employerProfile.company_description,
+      industry:
+        industry !== undefined ? industry?.trim() : employerProfile.industry,
+      company_size:
+        company_size !== undefined
+          ? company_size
+          : employerProfile.company_size,
     });
 
     res.status(200).json({
