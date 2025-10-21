@@ -27,7 +27,7 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING,
         allowNull: false,
         validate: {
-          isIn: [["PROJECT", "FREELANCE", "PART_TIME"]],
+          isIn: [["FULL_TIME", "PROJECT", "FREELANCE", "PART_TIME"]],
         },
       },
       budget_type: {
@@ -79,6 +79,11 @@ module.exports = (sequelize, DataTypes) => {
       skills_required: {
         type: DataTypes.ARRAY(DataTypes.STRING),
         defaultValue: [],
+      },
+      post_cost: {
+        type: DataTypes.DECIMAL(15, 2),
+        defaultValue: 0,
+        comment: "Chi phí đăng tin tuyển dụng",
       },
       rejection_reason: {
         type: DataTypes.TEXT,

@@ -1,8 +1,11 @@
 const { Job, Application, sequelize } = require("../models");
 const { Op } = require("sequelize");
+const walletController = require("./walletController");
 
 // Create a new job posting (Client/Employer)
 exports.createJob = async (req, res) => {
+  const transaction = await sequelize.transaction();
+
   try {
     // Get user from auth middleware
     const userId = req.userId; // Assuming Supabase auth middleware sets this
@@ -20,40 +23,89 @@ exports.createJob = async (req, res) => {
       experience_level,
       deadline,
       skills_required,
+      post_cost, // Giá tiền đăng bài
     } = req.body;
 
     // Basic validation
     if (!title || !description || !job_type || !budget_type) {
+      await transaction.rollback();
       return res.status(400).json({
         success: false,
         message: "Missing required fields",
       });
     }
 
+    // Validate post_cost
+    if (!post_cost || post_cost <= 0) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "Post cost is required and must be greater than 0",
+      });
+    }
+
+    console.log(userId);
+
+    // Trừ tiền từ ví trước khi tạo job
+    let walletResult;
+    try {
+      walletResult = await walletController.deductMoneyForJobPost(
+        userId,
+        post_cost,
+        null, // jobId sẽ được cập nhật sau khi tạo job
+        transaction
+      );
+    } catch (walletError) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: walletError.message,
+        error: "WALLET_ERROR",
+      });
+    }
+
     // Create job
-    const job = await Job.create({
-      owner_id: userId,
-      title,
-      description,
-      // category_id không tồn tại trong database
-      // category_id,
-      job_type,
-      budget_type,
-      budget_min,
-      budget_max,
-      currency,
-      experience_level,
-      deadline: deadline ? new Date(deadline) : null,
-      skills_required: skills_required || [],
-      status: "pending", // Jobs need admin approval by default
-    });
+    const job = await Job.create(
+      {
+        owner_id: userId,
+        title,
+        description,
+        // category_id không tồn tại trong database
+        // category_id,
+        job_type,
+        budget_type,
+        budget_min,
+        budget_max,
+        currency,
+        experience_level,
+        deadline: deadline ? new Date(deadline) : null,
+        skills_required: skills_required || [],
+        post_cost, // Lưu chi phí đăng bài
+        status: "pending", // Jobs need admin approval by default
+      },
+      { transaction }
+    );
+
+    // Cập nhật reference_id trong transaction
+    await walletResult.transaction.update(
+      { reference_id: job.id },
+      { transaction }
+    );
+
+    await transaction.commit();
 
     res.status(201).json({
       success: true,
-      message: "Job created successfully and awaiting approval",
-      data: job,
+      message:
+        "Job created successfully and awaiting approval. Money deducted from wallet.",
+      data: {
+        job,
+        wallet_balance: walletResult.balance_after,
+        amount_deducted: post_cost,
+      },
     });
   } catch (error) {
+    await transaction.rollback();
     res.status(500).json({
       success: false,
       message: "An error occurred while creating the job",
@@ -81,9 +133,8 @@ exports.getAllJobs = async (req, res) => {
     } = req.query;
 
     const where = {
-      status: "active", 
+      status: "active",
     };
-
 
     if (job_type) where.job_type = job_type;
     if (experience_level) where.experience_level = experience_level;
@@ -137,7 +188,7 @@ exports.getJobById = async (req, res) => {
   try {
     const { jobId } = req.params;
 
-    console.log(jobId)
+    console.log(jobId);
 
     const job = await Job.findOne({
       where: {
@@ -293,7 +344,7 @@ exports.getMyJobs = async (req, res) => {
   try {
     const userId = req.userId; // From auth middleware
     const { status, page = 1, limit = 10 } = req.query;
-
+    console.log("userID: ", userId);
     // Build where clause
     const where = {
       owner_id: userId,
@@ -308,7 +359,6 @@ exports.getMyJobs = async (req, res) => {
     // Get jobs
     const { count, rows: jobs } = await Job.findAndCountAll({
       where,
-      include: [{ model: Category, as: "category" }],
       order: [["created_at", "DESC"]],
       limit,
       offset,
@@ -382,7 +432,8 @@ exports.reviewJob = async (req, res) => {
 // Admin: Get jobs pending approval
 exports.getPendingJobs = async (req, res) => {
   try {
-    const { page, limit } = req.query;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
 
     // Get pending jobs
@@ -393,6 +444,7 @@ exports.getPendingJobs = async (req, res) => {
       limit,
       offset,
     });
+    console.log(1);
 
     res.status(200).json({
       success: true,

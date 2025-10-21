@@ -35,8 +35,9 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING,
         defaultValue: "pending",
         validate: {
-          isIn: [["pending", "accepted", "rejected", "withdrawn"]],
+          isIn: [["pending", "accepted", "rejected", "withdrawn", "completed"]],
         },
+        comment: "completed: job đã hoàn thành và thanh toán",
       },
       employer_notes: {
         type: DataTypes.TEXT,
@@ -72,6 +73,10 @@ module.exports = (sequelize, DataTypes) => {
   // Define associations in the model index file
   Application.associate = (models) => {
     Application.belongsTo(models.Job, { foreignKey: "job_id", as: "job" });
+    Application.belongsTo(models.FreelancerProfile, {
+      targetKey: "user_id",
+      as: "freelancer",
+    });
   };
 
   return Application;

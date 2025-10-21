@@ -3,7 +3,9 @@ const router = express.Router();
 const jobRoutes = require("./jobRoutes");
 const applicationRoutes = require("./applicationRoutes");
 const cvRoutes = require("./cv");
+const employerRoutes = require("./employerRoutes");
 const chatRoutes = require("./chatRoutes");
+const walletRoutes = require("./walletRoutes");
 const { authenticate } = require("../middleware/auth");
 // const categoryRoutes = require("./categoryRoutes");
 
@@ -25,10 +27,11 @@ router.get("/auth-check", authenticate, (req, res) => {
 });
 
 // Mount routes
-router.use("/v1", jobRoutes);
-router.use("/v1", applicationRoutes);
-router.use("/v1", cvRoutes);
-router.use("/v1", chatRoutes);
+router.use("/", jobRoutes);
+router.use("/", applicationRoutes);
+router.use("/", cvRoutes);
+router.use("/", employerRoutes);
+router.use("/", chatRoutes);
+router.use("/", walletRoutes);
 // router.use("/v1", categoryRoutes);
-
 module.exports = router;

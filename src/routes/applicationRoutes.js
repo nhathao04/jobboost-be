@@ -16,20 +16,25 @@ router.get(
 );
 router.put(
   "/applications/:applicationId/withdraw",
-  authenticate, 
+  authenticate,
   applicationController.withdrawApplication
 );
 
 // Client (employer) routes
-// router.get(
-//   "/jobs/:jobId/applications",
-//   authenticate,
-//   applicationController.getApplicationsForJob
-// );
+router.get(
+  "/jobs/:jobId/applications",
+  authenticate,
+  applicationController.getApplicationsForJob
+);
 router.put(
   "/applications/:applicationId/status",
   authenticate,
   applicationController.updateApplicationStatus
+);
+router.post(
+  "/applications/:applicationId/complete",
+  authenticate,
+  applicationController.completeJobAndTransferMoney
 );
 
 // Common routes (both freelancer and client)

@@ -319,23 +319,14 @@ exports.deleteCV = async (req, res) => {
 // Download CV file
 exports.downloadCV = async (req, res) => {
   try {
-    const userId = req.userId; // Replace with actual auth middleware value
     const { id } = req.params;
 
     const cv = await CV.findOne({
       where: {
         id,
-        user_id: userId,
         status: 'active'
       }
     });
-
-    if (!cv) {
-      return res.status(404).json({
-        success: false,
-        message: "CV not found"
-      });
-    }
 
     // Check if file exists
     if (!fs.existsSync(cv.file_path)) {
