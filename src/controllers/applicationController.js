@@ -1,11 +1,22 @@
-const { Application, Job, FreelancerProfile, CV, sequelize } = require("../models");
+const {
+  Application,
+  Job,
+  FreelancerProfile,
+  CV,
+  Wallet,
+  WalletTransaction,
+  sequelize,
+} = require("../models");
 const { Op } = require("sequelize");
 const { createClient } = require("@supabase/supabase-js");
 
 // Initialize Supabase client (if configured)
 let supabase = null;
 if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+  supabase = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  );
 }
 
 // Apply for a job (Freelancer)
@@ -16,12 +27,13 @@ exports.applyForJob = async (req, res) => {
 
     // If user haven't any CV, block apply
     const cvCount = await CV.count({
-      where: { user_id: userId, status: 'active' }
+      where: { user_id: userId, status: "active" },
     });
     if (cvCount === 0) {
       return res.status(400).json({
         success: false,
-        message: "You must upload at least one active CV before applying for jobs",
+        message:
+          "You must upload at least one active CV before applying for jobs",
       });
     }
 
@@ -231,14 +243,14 @@ exports.getApplicationsForJob = async (req, res) => {
     const applicationsWithUser = await Promise.all(
       applications.map(async (app) => {
         const appData = app.toJSON();
-        
+
         // Get primary CV for this applicant
         const primaryCV = await CV.findOne({
           where: {
             user_id: appData.applicant_id,
-            status: 'active'
+            status: "active",
           },
-          attributes: ['id', 'name', 'file_name', 'file_path']
+          attributes: ["id", "name", "file_name", "file_path"],
         });
 
         console.log(primaryCV);
@@ -247,22 +259,21 @@ exports.getApplicationsForJob = async (req, res) => {
         let fullName = null;
         if (supabase) {
           try {
-            const { data: userData, error } = await supabase.auth.admin.getUserById(
-              appData.applicant_id
-            );
-            
+            const { data: userData, error } =
+              await supabase.auth.admin.getUserById(appData.applicant_id);
+
             if (!error && userData?.user) {
               // Try to get full_name from user_metadata or raw_user_meta_data
-              fullName = 
-                userData.user.user_metadata?.full_name || 
+              fullName =
+                userData.user.user_metadata?.full_name ||
                 userData.user.user_metadata?.name ||
                 userData.user.raw_user_meta_data?.full_name ||
                 userData.user.raw_user_meta_data?.name ||
-                userData.user.email?.split('@')[0] || // Fallback to email username
+                userData.user.email?.split("@")[0] || // Fallback to email username
                 null;
             }
           } catch (supabaseError) {
-            console.error('Error fetching user from Supabase:', supabaseError);
+            console.error("Error fetching user from Supabase:", supabaseError);
             // Continue without user data
           }
         }
@@ -272,12 +283,14 @@ exports.getApplicationsForJob = async (req, res) => {
           ...appData,
           user: {
             full_name: fullName,
-            cv: primaryCV ? {
-              id: primaryCV.id,
-              name: primaryCV.name,
-              file_name: primaryCV.file_name
-            } : null
-          }
+            cv: primaryCV
+              ? {
+                  id: primaryCV.id,
+                  name: primaryCV.name,
+                  file_name: primaryCV.file_name,
+                }
+              : null,
+          },
         };
       })
     );
@@ -453,6 +466,191 @@ exports.deleteApplication = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "An error occurred while deleting the application",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Chốt job thành công và chuyển tiền cho freelancer
+ * POST /api/applications/:applicationId/complete
+ */
+exports.completeJobAndTransferMoney = async (req, res) => {
+  const transaction = await sequelize.transaction();
+
+  try {
+    const { applicationId } = req.params;
+    const userId = req.userId; // Employer ID
+
+    // Tìm application
+    const application = await Application.findByPk(applicationId, {
+      include: [
+        {
+          model: Job,
+          as: "job",
+        },
+      ],
+      transaction,
+    });
+
+    if (!application) {
+      await transaction.rollback();
+      return res.status(404).json({
+        success: false,
+        message: "Application not found",
+      });
+    }
+
+    // Kiểm tra quyền (chỉ employer owner mới được chốt)
+    if (application.job.owner_id !== userId) {
+      await transaction.rollback();
+      return res.status(403).json({
+        success: false,
+        message: "You do not have permission to complete this job",
+      });
+    }
+
+    // Kiểm tra trạng thái application (phải là accepted)
+    if (application.status !== "accepted") {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: `Cannot complete job. Application status must be 'accepted', current status: '${application.status}'`,
+      });
+    }
+
+    // Kiểm tra job đã completed chưa
+    if (application.job.status === "completed") {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "This job has already been completed",
+      });
+    }
+
+    // Lấy post_cost từ job (số tiền employer đã trả khi đăng tin)
+    const transferAmount = parseFloat(application.job.post_cost);
+
+    if (!transferAmount || transferAmount <= 0) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "Invalid job post cost. Cannot transfer money to freelancer.",
+      });
+    }
+
+    const freelancerId = application.applicant_id;
+
+    // Tìm hoặc tạo ví cho freelancer
+    let freelancerWallet = await Wallet.findOne({
+      where: { user_id: freelancerId },
+      transaction,
+    });
+
+    if (!freelancerWallet) {
+      // Tự động tạo ví cho freelancer nếu chưa có
+      freelancerWallet = await Wallet.create(
+        {
+          user_id: freelancerId,
+          balance: 0,
+          currency: "VND",
+          total_deposited: 0,
+          total_spent: 0,
+          is_active: true,
+        },
+        { transaction }
+      );
+      console.log(`✅ Auto-created wallet for freelancer ${freelancerId}`);
+    }
+
+    if (!freelancerWallet.is_active) {
+      await transaction.rollback();
+      return res.status(403).json({
+        success: false,
+        message: "Freelancer wallet is not active",
+      });
+    }
+
+    // Cộng tiền vào ví freelancer
+    const freelancerBalanceBefore = parseFloat(freelancerWallet.balance);
+    const freelancerBalanceAfter = freelancerBalanceBefore + transferAmount;
+
+    await freelancerWallet.update(
+      {
+        balance: freelancerBalanceAfter,
+        total_deposited:
+          parseFloat(freelancerWallet.total_deposited) + transferAmount,
+      },
+      { transaction }
+    );
+
+    // Tạo transaction cho freelancer (nhận tiền)
+    await WalletTransaction.create(
+      {
+        wallet_id: freelancerWallet.id,
+        transaction_type: "JOB_POST",
+        amount: transferAmount,
+        currency: freelancerWallet.currency,
+        balance_before: freelancerBalanceBefore,
+        balance_after: freelancerBalanceAfter,
+        reference_id: application.job.id,
+        reference_type: "JOB_COMPLETED",
+        description: `Payment received for completing job: ${application.job.title}`,
+        status: "completed",
+        metadata: {
+          job_id: application.job.id,
+          application_id: application.id,
+          employer_id: userId,
+        },
+      },
+      { transaction }
+    );
+
+    // Cập nhật trạng thái application thành completed
+    await application.update(
+      {
+        status: "completed",
+      },
+      { transaction }
+    );
+
+    // Cập nhật trạng thái job thành completed
+    await application.job.update(
+      {
+        status: "completed",
+      },
+      { transaction }
+    );
+
+    await transaction.commit();
+
+    res.status(200).json({
+      success: true,
+      message: "Job completed successfully. Money transferred to freelancer.",
+      data: {
+        application: {
+          id: application.id,
+          status: "completed",
+        },
+        job: {
+          id: application.job.id,
+          title: application.job.title,
+          status: "completed",
+        },
+        payment: {
+          amount: transferAmount,
+          currency: "VND",
+          freelancer_id: freelancerId,
+          freelancer_new_balance: freelancerBalanceAfter,
+        },
+      },
+    });
+  } catch (error) {
+    await transaction.rollback();
+    console.error("Error completing job and transferring money:", error);
+    res.status(500).json({
+      success: false,
+      message: "An error occurred while completing the job",
       error: error.message,
     });
   }

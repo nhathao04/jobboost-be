@@ -35,8 +35,9 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING,
         defaultValue: "pending",
         validate: {
-          isIn: [["pending", "accepted", "rejected", "withdrawn"]],
+          isIn: [["pending", "accepted", "rejected", "withdrawn", "completed"]],
         },
+        comment: "completed: job đã hoàn thành và thanh toán",
       },
       employer_notes: {
         type: DataTypes.TEXT,
