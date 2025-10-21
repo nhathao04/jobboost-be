@@ -42,7 +42,7 @@ const { authenticate } = require("../middleware/auth");
  *       400:
  *         description: Số dư ban đầu không hợp lệ
  */
-router.post("/create", authenticate, walletController.createWallet);
+router.post("/wallet/create", authenticate, walletController.createWallet);
 
 /**
  * @swagger
