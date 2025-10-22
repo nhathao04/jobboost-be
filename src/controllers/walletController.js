@@ -370,17 +370,23 @@ exports.rechargeWallet = async (req, res) => {
       await wallet.update({ wallet_code: genWalletCode() });
     }
 
-    await wallet.update({
-      balance: parseFloat(wallet.balance) + amount,
-      total_deposited: parseFloat(wallet.total_deposited) + amount,
-      wallet_code: genWalletCode(),
-    });
-
-    return res.status(200).json({
-      success: true,
-      message: "Wallet recharged successfully",
-      data: wallet,
-    });
+    if (wallet.wallet_code == code) {
+      await wallet.update({
+        balance: parseFloat(wallet.balance) + amount,
+        total_deposited: parseFloat(wallet.total_deposited) + amount,
+        wallet_code: genWalletCode(),
+      });
+      return res.status(200).json({
+        success: true,
+        message: "Wallet recharged successfully",
+        data: wallet,
+      });
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: "Wallet code does not match",
+      });
+    }
   } catch (error) {
     console.error("Error recharging wallet:", error);
     res.status(500).json({
