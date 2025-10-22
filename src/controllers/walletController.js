@@ -376,6 +376,11 @@ exports.rechargeWallet = async (req, res) => {
       wallet_code: genWalletCode(),
     });
 
+    return res.status(200).json({
+      success: true,
+      message: "Wallet recharged successfully",
+      data: wallet,
+    });
   } catch (error) {
     console.error("Error recharging wallet:", error);
     res.status(500).json({
