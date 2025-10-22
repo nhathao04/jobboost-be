@@ -28,6 +28,11 @@ module.exports = (sequelize, DataTypes) => {
           isIn: [["USD", "VND", "EUR", "JPY"]],
         },
       },
+      wallet_code: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        unique: true,
+      },
       total_deposited: {
         type: DataTypes.DECIMAL(15, 2),
         defaultValue: 0,

@@ -37,6 +37,10 @@ const env = {
     // Security Configuration
     BCRYPT: {
         ROUNDS: parseInt(process.env.BCRYPT_ROUNDS) || 12
+    },
+
+    PAYMENT: {
+        GATEWAY_URL: process.env.PAYMENT_GATEWAY_URL || 'http://localhost:3020/payment'
     }
 };
 
