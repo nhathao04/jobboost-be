@@ -16,7 +16,9 @@ const authMiddleware = (req, res, next) => {
     if (err) {
       return res.status(401).json({ message: "Unauthorized!" });
     }
-    req.userId = decoded.sub;
+    // Token có thể có field 'sub' (Supabase) hoặc 'id' (local JWT)
+    req.userId = decoded.sub || decoded.id;
+    console.log('User ID from token:', req.userId);
     next();
   });
 };
