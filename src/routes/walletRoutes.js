@@ -3,6 +3,10 @@ const router = express.Router();
 const walletController = require("../controllers/walletController");
 const { authenticate } = require("../middleware/auth");
 
+
+router.get("/wallet/code", authenticate, walletController.getWalletCode);
+router.post("/wallet/recharge", authenticate, walletController.rechargeWallet);
+
 /**
  * @swagger
  * tags:
