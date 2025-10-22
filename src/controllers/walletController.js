@@ -1,5 +1,7 @@
 const { Wallet, WalletTransaction, sequelize } = require("../models");
 const { Op } = require("sequelize");
+const axios = require("axios");
+const { env } = require("../config/env");
 
 /**
  * Tạo ví mới cho user
@@ -8,7 +10,7 @@ const { Op } = require("sequelize");
 exports.createWallet = async (req, res) => {
   try {
     const userId = req.userId;
-    console.log('Creating wallet for user:', userId);
+    console.log("Creating wallet for user:", userId);
     const { currency = "VND", initial_balance = 0 } = req.body;
 
     // Kiểm tra ví đã tồn tại chưa
@@ -79,7 +81,7 @@ exports.createWallet = async (req, res) => {
 exports.getWallet = async (req, res) => {
   try {
     const userId = req.userId;
-    console.log('Fetching wallet for user:', userId);
+    console.log("Fetching wallet for user:", userId);
 
     const wallet = await Wallet.findOne({
       where: { user_id: userId },
@@ -320,3 +322,115 @@ exports.refundMoneyForJob = async (
     throw error;
   }
 };
+
+exports.rechargeWallet = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { code } = req.body;
+
+    // Validate code
+    if (!code || typeof code !== "string" || code.trim() === "") {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid wallet code",
+      });
+    }
+
+    const response = await axios.get(env.PAYMENT.GATEWAY_URL + `/${code}`);
+
+    if (!response.data || !response.data.status || response.data.status !== "ok") {
+      return res.status(400).json({
+        success: false,
+        message: "Failed to recharge wallet",
+      });
+    }
+    const { money } = response.data;
+    // Lọc money từ string sang number, loại bỏ ký tự không phải số
+    const amount = parseFloat(money.toString().replace(/[^0-9.-]+/g, ""));
+    if (isNaN(amount) || amount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid wallet money amount",
+      });
+    }
+
+    const wallet = await Wallet.findOne({
+      where: { user_id: userId },
+    });
+
+    if (!wallet) {
+      const wallet = await Wallet.create({
+        user_id: userId,
+        balance: initialBalance,
+        currency,
+        total_deposited: initialBalance,
+        total_spent: 0,
+        wallet_code: genWalletCode(),
+        is_active: true,
+      });
+    } else if (!wallet.wallet_code || wallet.wallet_code.trim() === "") {
+      await wallet.update({ wallet_code: genWalletCode() });
+    }
+
+    if (wallet.wallet_code == code) {
+      await wallet.update({
+        balance: parseFloat(wallet.balance) + amount,
+        total_deposited: parseFloat(wallet.total_deposited) + amount,
+        wallet_code: genWalletCode(),
+      });
+      return res.status(200).json({
+        success: true,
+        message: "Wallet recharged successfully",
+        data: wallet,
+      });
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: "Wallet code does not match",
+      });
+    }
+  } catch (error) {
+    console.error("Error recharging wallet:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error recharging wallet",
+      error: error.message,
+    });
+  }
+};
+
+exports.getWalletCode = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const wallet = await Wallet.findOne({
+      where: { user_id: userId },
+    });
+    if (!wallet) {
+      const wallet = await Wallet.create({
+        user_id: userId,
+        balance: initialBalance,
+        currency,
+        total_deposited: initialBalance,
+        total_spent: 0,
+        wallet_code: genWalletCode(),
+        is_active: true,
+      });
+    } else if (!wallet.wallet_code || wallet.wallet_code.trim() === "") {
+      await wallet.update({ wallet_code: genWalletCode() });
+    }
+    res.status(200).json({
+      success: true,
+      data: { wallet_code: wallet.wallet_code },
+    });
+  } catch (error) {
+    console.error("Error fetching wallet code:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching wallet code",
+      error: error.message,
+    });
+  }
+};
+
+const genWalletCode = () =>
+  Array.from({ length: 6 }, () => "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"[Math.floor(Math.random() * 36)]).join("");

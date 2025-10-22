@@ -3,6 +3,10 @@ const router = express.Router();
 const walletController = require("../controllers/walletController");
 const { authenticate } = require("../middleware/auth");
 
+
+router.get("/wallet/code", authenticate, walletController.getWalletCode);
+router.post("/wallet/recharge", authenticate, walletController.rechargeWallet);
+
 /**
  * @swagger
  * tags:
@@ -58,7 +62,7 @@ router.post("/wallet/create", authenticate, walletController.createWallet);
  *       404:
  *         description: Không tìm thấy ví
  */
-router.get("/wallet", walletController.getWallet);
+router.get("/wallet", authenticate, walletController.getWallet);
 
 /**
  * @swagger
