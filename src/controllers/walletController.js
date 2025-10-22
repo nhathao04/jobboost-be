@@ -10,7 +10,7 @@ const { env } = require("../config/env");
 exports.createWallet = async (req, res) => {
   try {
     const userId = req.userId;
-    console.log('Creating wallet for user:', userId);
+    console.log("Creating wallet for user:", userId);
     const { currency = "VND", initial_balance = 0 } = req.body;
 
     // Kiểm tra ví đã tồn tại chưa
@@ -81,7 +81,7 @@ exports.createWallet = async (req, res) => {
 exports.getWallet = async (req, res) => {
   try {
     const userId = req.userId;
-    console.log('Fetching wallet for user:', userId);
+    console.log("Fetching wallet for user:", userId);
 
     const wallet = await Wallet.findOne({
       where: { user_id: userId },

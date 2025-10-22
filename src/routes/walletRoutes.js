@@ -62,7 +62,7 @@ router.post("/wallet/create", authenticate, walletController.createWallet);
  *       404:
  *         description: Không tìm thấy ví
  */
-router.get("/wallet", walletController.getWallet);
+router.get("/wallet", authenticate, walletController.getWallet);
 
 /**
  * @swagger
