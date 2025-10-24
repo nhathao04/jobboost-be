@@ -1,5 +1,15 @@
 const { Conversation, Message, Job } = require("../models");
 const { Op } = require("sequelize");
+const { createClient } = require("@supabase/supabase-js");
+
+// Initialize Supabase client
+let supabase = null;
+if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  supabase = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  );
+}
 
 /**
  * @swagger
@@ -36,6 +46,35 @@ const getConversations = async (req, res) => {
       order: [["last_message_at", "DESC"]],
     });
 
+    // Lấy danh sách tất cả otherUserIds
+    const otherUserIds = conversations.map((conversation) => {
+      const isClient = conversation.client_id === userId;
+      return isClient ? conversation.freelancer_id : conversation.client_id;
+    });
+
+    // Lấy thông tin users từ Supabase
+    let usersMap = {};
+    if (supabase && otherUserIds.length > 0) {
+      try {
+        const { data: users, error } = await supabase.auth.admin.listUsers();
+        
+        if (!error && users) {
+          // Tạo map để tra cứu nhanh
+          users.users.forEach((user) => {
+            usersMap[user.id] = {
+              id: user.id,
+              email: user.email,
+              full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Unknown User',
+              avatar_url: user.user_metadata?.avatar_url || null,
+            };
+          });
+        }
+      } catch (supabaseError) {
+        console.error("Error fetching users from Supabase:", supabaseError);
+        // Tiếp tục xử lý, chỉ không có thông tin user
+      }
+    }
+
     // Format the response data
     const formattedConversations = conversations.map((conversation) => {
       const isClient = conversation.client_id === userId;
@@ -43,13 +82,17 @@ const getConversations = async (req, res) => {
         ? conversation.freelancer_id
         : conversation.client_id;
 
+      // Lấy thông tin user từ map hoặc dùng thông tin mặc định
+      const otherUser = usersMap[otherUserId] || {
+        id: otherUserId,
+        email: null,
+        full_name: "Unknown User",
+        avatar_url: null,
+      };
+
       return {
         id: conversation.id,
-        otherUser: {
-          id: otherUserId,
-          // Note: User data should be fetched separately from Supabase
-          // or through a separate API call
-        },
+        otherUser: otherUser,
         job: conversation.job
           ? {
               id: conversation.job.id,

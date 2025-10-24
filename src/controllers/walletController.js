@@ -338,7 +338,11 @@ exports.rechargeWallet = async (req, res) => {
 
     const response = await axios.get(env.PAYMENT.GATEWAY_URL + `/${code}`);
 
-    if (!response.data || !response.data.status || response.data.status !== "ok") {
+    if (
+      !response.data ||
+      !response.data.status ||
+      response.data.status !== "ok"
+    ) {
       return res.status(400).json({
         success: false,
         message: "Failed to recharge wallet",
@@ -373,15 +377,53 @@ exports.rechargeWallet = async (req, res) => {
     }
 
     if (wallet.wallet_code == code) {
+      const balanceBefore = parseFloat(wallet.balance);
+      const balanceAfter = balanceBefore + amount;
+
+      // Cập nhật số dư ví
       await wallet.update({
-        balance: parseFloat(wallet.balance) + amount,
+        balance: balanceAfter,
         total_deposited: parseFloat(wallet.total_deposited) + amount,
         wallet_code: genWalletCode(),
       });
+
+      // ✅ LƯU TRANSACTION KHI NẠP TIỀN
+      await WalletTransaction.create({
+        wallet_id: wallet.id,
+        transaction_type: "DEPOSIT",
+        amount: amount,
+        currency: wallet.currency,
+        balance_before: balanceBefore,
+        balance_after: balanceAfter,
+        reference_id: code,
+        reference_type: "RECHARGE",
+        description: `Recharged wallet with code: ${code}`,
+        status: "completed",
+        metadata: {
+          code: code,
+          payment_gateway: env.PAYMENT.GATEWAY_URL,
+        },
+      });
+
+      console.log(`✅ Wallet recharged: ${userId} - Amount: ${amount} VND`);
+
       return res.status(200).json({
         success: true,
         message: "Wallet recharged successfully",
-        data: wallet,
+        data: {
+          wallet: {
+            id: wallet.id,
+            balance: balanceAfter,
+            currency: wallet.currency,
+            total_deposited: parseFloat(wallet.total_deposited) + amount,
+          },
+          transaction: {
+            amount: amount,
+            balance_before: balanceBefore,
+            balance_after: balanceAfter,
+            type: "DEPOSIT",
+          },
+        },
       });
     } else {
       return res.status(400).json({
@@ -433,4 +475,7 @@ exports.getWalletCode = async (req, res) => {
 };
 
 const genWalletCode = () =>
-  Array.from({ length: 6 }, () => "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"[Math.floor(Math.random() * 36)]).join("");
+  Array.from(
+    { length: 6 },
+    () => "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"[Math.floor(Math.random() * 36)]
+  ).join("");
