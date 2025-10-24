@@ -395,7 +395,6 @@ exports.rechargeWallet = async (req, res) => {
         currency: wallet.currency,
         balance_before: balanceBefore,
         balance_after: balanceAfter,
-        reference_id: code,
         reference_type: "RECHARGE",
         description: `Recharged wallet with code: ${code}`,
         status: "completed",
