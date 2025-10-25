@@ -1,7 +1,7 @@
 const { Server } = require("socket.io");
 const jwt = require("jsonwebtoken");
 const { authConfig } = require("./auth");
-const { Conversation, Message } = require("../models");
+const { Conversation, Message, VideoCall } = require("../models");
 const { Op } = require("sequelize");
 
 let io;
@@ -294,6 +294,100 @@ const initialize = (server) => {
         userId: socket.userId,
         isTyping: false,
       });
+    });
+
+    // ---- WebRTC Signaling events ----
+    // Initiate a call (from caller to callee)
+    socket.on("webrtc:call", async (data) => {
+      const { to, callId, room_name } = data || {};
+      try {
+        let cid = callId;
+        // If no callId provided, create a VideoCall record as fallback
+        if (!cid && VideoCall) {
+          const call = await VideoCall.create({
+            host_id: socket.userId,
+            guest_id: to || null,
+            room_name: room_name || null,
+            status: "pending",
+          });
+          cid = call.id;
+        }
+
+        io.to(`user:${to}`).emit("webrtc:incoming-call", {
+          from: socket.userId,
+          callId: cid,
+          room_name: room_name || null,
+        });
+      } catch (error) {
+        console.error("Error handling webrtc:call:", error);
+        socket.emit("error", { message: "Failed to initiate call" });
+      }
+    });
+
+    // Forward call acceptance (from callee to caller)
+    socket.on("webrtc:call-accepted", (data) => {
+      const { to, callId } = data || {};
+      if (!to) return;
+      io.to(`user:${to}`).emit("webrtc:call-accepted", {
+        from: socket.userId,
+        callId,
+      });
+    });
+
+    // Forward SDP offer
+    socket.on("webrtc:offer", (data) => {
+      const { to, sdp, callId } = data || {};
+      if (!to) return;
+      io.to(`user:${to}`).emit("webrtc:offer", {
+        from: socket.userId,
+        sdp,
+        callId,
+      });
+    });
+
+    // Forward SDP answer
+    socket.on("webrtc:answer", (data) => {
+      const { to, sdp, callId } = data || {};
+      if (!to) return;
+      io.to(`user:${to}`).emit("webrtc:answer", {
+        from: socket.userId,
+        sdp,
+        callId,
+      });
+    });
+
+    // Forward ICE candidates
+    socket.on("webrtc:ice-candidate", (data) => {
+      const { to, candidate, callId } = data || {};
+      if (!to) return;
+      io.to(`user:${to}`).emit("webrtc:ice-candidate", {
+        from: socket.userId,
+        candidate,
+        callId,
+      });
+    });
+
+    // End call event
+    socket.on("webrtc:end-call", async (data) => {
+      const { to, callId } = data || {};
+      try {
+        if (callId && VideoCall) {
+          const call = await VideoCall.findByPk(callId);
+          if (call) {
+            call.status = "ended";
+            await call.save();
+          }
+        }
+
+        if (to) {
+          io.to(`user:${to}`).emit("webrtc:end-call", {
+            from: socket.userId,
+            callId,
+          });
+        }
+      } catch (error) {
+        console.error("Error handling webrtc:end-call:", error);
+      }
     });
 
     // Handle disconnect event
