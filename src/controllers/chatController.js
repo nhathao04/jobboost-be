@@ -57,14 +57,17 @@ const getConversations = async (req, res) => {
     if (supabase && otherUserIds.length > 0) {
       try {
         const { data: users, error } = await supabase.auth.admin.listUsers();
-        
+
         if (!error && users) {
           // Tạo map để tra cứu nhanh
           users.users.forEach((user) => {
             usersMap[user.id] = {
               id: user.id,
               email: user.email,
-              full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Unknown User',
+              full_name:
+                user.user_metadata?.full_name ||
+                user.email?.split("@")[0] ||
+                "Unknown User",
               avatar_url: user.user_metadata?.avatar_url || null,
             };
           });
