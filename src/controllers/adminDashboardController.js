@@ -5,7 +5,6 @@ const {
   WalletTransaction,
   PlatformReview,
   PlatformRevenue,
-  JobReview,
   sequelize,
 } = require("../models");
 const { Op } = require("sequelize");
@@ -144,8 +143,8 @@ exports.getDashboardOverview = async (req, res) => {
       raw: true,
     });
 
-    // 4. Tổng số đánh giá (Job Reviews)
-    const reviewStats = await JobReview.findAll({
+    // 4. Tổng số đánh giá (Platform Reviews)
+    const reviewStats = await PlatformReview.findAll({
       where: dateFilter,
       attributes: [
         [sequelize.fn("COUNT", sequelize.col("id")), "total_reviews"],
@@ -153,16 +152,14 @@ exports.getDashboardOverview = async (req, res) => {
         [
           sequelize.fn(
             "COUNT",
-            sequelize.literal(
-              "CASE WHEN reviewer_role = 'FREELANCER' THEN 1 END"
-            )
+            sequelize.literal("CASE WHEN user_role = 'FREELANCER' THEN 1 END")
           ),
           "freelancer_reviews",
         ],
         [
           sequelize.fn(
             "COUNT",
-            sequelize.literal("CASE WHEN reviewer_role = 'EMPLOYER' THEN 1 END")
+            sequelize.literal("CASE WHEN user_role = 'EMPLOYER' THEN 1 END")
           ),
           "employer_reviews",
         ],
@@ -617,7 +614,7 @@ exports.getUsersDetails = async (req, res) => {
           });
         }
 
-        // Count reviews
+        // Count reviews (platform reviews by this user)
         reviewsCount = await PlatformReview.count({
           where: { user_id: user.id },
         });
@@ -791,7 +788,7 @@ exports.getTransactionsDetails = async (req, res) => {
 };
 
 /**
- * Admin - Chi tiết đánh giá (Job Reviews Details)
+ * Admin - Chi tiết đánh giá (Platform Reviews Details)
  * GET /api/admin/dashboard/reviews
  */
 exports.getReviewsDetails = async (req, res) => {
@@ -811,9 +808,9 @@ exports.getReviewsDetails = async (req, res) => {
     const where = {};
 
     // Filters
-    if (reviewer_role) where.reviewer_role = reviewer_role.toUpperCase();
+    if (reviewer_role) where.user_role = reviewer_role.toUpperCase();
     if (rating) where.rating = parseInt(rating);
-    if (job_id) where.job_id = job_id;
+    // Bỏ filter job_id vì platform review không liên quan đến job cụ thể
 
     if (start_date || end_date) {
       where.created_at = {};
@@ -823,15 +820,8 @@ exports.getReviewsDetails = async (req, res) => {
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
-    const { count, rows: reviews } = await JobReview.findAndCountAll({
+    const { count, rows: reviews } = await PlatformReview.findAndCountAll({
       where,
-      include: [
-        {
-          model: Job,
-          as: "job",
-          attributes: ["id", "title", "status"],
-        },
-      ],
       order: [[sort_by, sort_dir]],
       limit: parseInt(limit),
       offset,
@@ -843,41 +833,30 @@ exports.getReviewsDetails = async (req, res) => {
         const reviewObj = review.toJSON();
 
         if (supabase) {
-          // Get reviewer info
-          const { data: reviewer } = await supabase.auth.admin.getUserById(
-            review.reviewer_id
-          );
-          reviewObj.reviewer = reviewer
-            ? {
-                id: reviewer.id,
-                email: reviewer.email,
-                full_name: reviewer.user_metadata?.full_name || "Unknown",
-              }
-            : null;
+          // Get reviewer info (user who wrote the review)
+          const { data: reviewerData, error: reviewerError } =
+            await supabase.auth.admin.getUserById(review.user_id);
 
-          // Get employer info
-          const { data: employer } = await supabase.auth.admin.getUserById(
-            review.employer_id
-          );
-          reviewObj.employer = employer
-            ? {
-                id: employer.id,
-                email: employer.email,
-                full_name: employer.user_metadata?.full_name || "Unknown",
-              }
-            : null;
-
-          // Get freelancer info
-          const { data: freelancer } = await supabase.auth.admin.getUserById(
-            review.freelancer_id
-          );
-          reviewObj.freelancer = freelancer
-            ? {
-                id: freelancer.id,
-                email: freelancer.email,
-                full_name: freelancer.user_metadata?.full_name || "Unknown",
-              }
-            : null;
+          if (!reviewerError && reviewerData) {
+            const user = reviewerData.user || reviewerData;
+            reviewObj.reviewer = {
+              id: user.id,
+              email: user.email,
+              full_name:
+                user.user_metadata?.full_name ||
+                user.raw_user_meta_data?.full_name ||
+                user.email?.split("@")[0] ||
+                "Unknown User",
+              role: review.user_role,
+            };
+          } else {
+            reviewObj.reviewer = {
+              id: review.user_id,
+              email: "Unknown",
+              full_name: "Unknown User",
+              role: review.user_role,
+            };
+          }
         }
 
         return reviewObj;
@@ -885,23 +864,21 @@ exports.getReviewsDetails = async (req, res) => {
     );
 
     // Statistics
-    const stats = await JobReview.findAll({
+    const stats = await PlatformReview.findAll({
       where,
       attributes: [
         [sequelize.fn("AVG", sequelize.col("rating")), "average_rating"],
         [
           sequelize.fn(
             "COUNT",
-            sequelize.literal("CASE WHEN reviewer_role = 'EMPLOYER' THEN 1 END")
+            sequelize.literal("CASE WHEN user_role = 'EMPLOYER' THEN 1 END")
           ),
           "employer_review_count",
         ],
         [
           sequelize.fn(
             "COUNT",
-            sequelize.literal(
-              "CASE WHEN reviewer_role = 'FREELANCER' THEN 1 END"
-            )
+            sequelize.literal("CASE WHEN user_role = 'FREELANCER' THEN 1 END")
           ),
           "freelancer_review_count",
         ],
@@ -910,7 +887,7 @@ exports.getReviewsDetails = async (req, res) => {
     });
 
     // Rating distribution
-    const ratingDist = await JobReview.findAll({
+    const ratingDist = await PlatformReview.findAll({
       where,
       attributes: [
         "rating",
