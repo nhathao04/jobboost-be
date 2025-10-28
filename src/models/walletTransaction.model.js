@@ -58,6 +58,11 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
         comment: "Mô tả giao dịch",
       },
+      platform_fee: {
+        type: DataTypes.DECIMAL(15, 2),
+        defaultValue: 0,
+        comment: "Phí nền tảng (số tiền được giữ lại bởi platform)",
+      },
       status: {
         type: DataTypes.STRING,
         defaultValue: "completed",
