@@ -1,30 +1,36 @@
 # Admin Reject Job Post with Refund API
 
 ## Overview
+
 API này cho phép admin reject một job post và tự động hoàn tiền (refund) về ví của employer.
 
 ## Endpoint
+
 ```
 PUT /api/admin/jobs/:jobId/review
 ```
 
 ## Authentication
+
 - Yêu cầu: Admin authentication (cần implement middleware kiểm tra admin role)
 
 ## Request
 
 ### URL Parameters
-| Parameter | Type   | Required | Description          |
-|-----------|--------|----------|----------------------|
-| jobId     | UUID   | Yes      | ID của job cần review|
+
+| Parameter | Type | Required | Description           |
+| --------- | ---- | -------- | --------------------- |
+| jobId     | UUID | Yes      | ID của job cần review |
 
 ### Body Parameters
+
 | Parameter        | Type   | Required | Description                           |
-|------------------|--------|----------|---------------------------------------|
-| status           | String | Yes      | Trạng thái: "active" hoặc "rejected" |
-| rejection_reason | String | No       | Lý do từ chối (bắt buộc nếu rejected)|
+| ---------------- | ------ | -------- | ------------------------------------- |
+| status           | String | Yes      | Trạng thái: "active" hoặc "rejected"  |
+| rejection_reason | String | No       | Lý do từ chối (bắt buộc nếu rejected) |
 
 ### Example Request - Approve
+
 ```json
 PUT /api/admin/jobs/123e4567-e89b-12d3-a456-426614174000/review
 Content-Type: application/json
@@ -35,6 +41,7 @@ Content-Type: application/json
 ```
 
 ### Example Request - Reject with Refund
+
 ```json
 PUT /api/admin/jobs/123e4567-e89b-12d3-a456-426614174000/review
 Content-Type: application/json
@@ -48,6 +55,7 @@ Content-Type: application/json
 ## Response
 
 ### Success Response - Approved (200 OK)
+
 ```json
 {
   "success": true,
@@ -69,6 +77,7 @@ Content-Type: application/json
 ```
 
 ### Success Response - Rejected with Refund (200 OK)
+
 ```json
 {
   "success": true,
@@ -97,6 +106,7 @@ Content-Type: application/json
 ### Error Responses
 
 #### Invalid Status (400 Bad Request)
+
 ```json
 {
   "success": false,
@@ -105,6 +115,7 @@ Content-Type: application/json
 ```
 
 #### Job Not Found (404 Not Found)
+
 ```json
 {
   "success": false,
@@ -113,6 +124,7 @@ Content-Type: application/json
 ```
 
 #### Job Already Processed (400 Bad Request)
+
 ```json
 {
   "success": false,
@@ -121,6 +133,7 @@ Content-Type: application/json
 ```
 
 #### Wallet Not Found (400 Bad Request)
+
 ```json
 {
   "success": false,
@@ -130,6 +143,7 @@ Content-Type: application/json
 ```
 
 #### Server Error (500 Internal Server Error)
+
 ```json
 {
   "success": false,
@@ -141,6 +155,7 @@ Content-Type: application/json
 ## How It Works
 
 ### Flow khi Admin Approve Job
+
 1. Admin gửi request với `status: "active"`
 2. Hệ thống kiểm tra job có status là "pending" không
 3. Cập nhật job status thành "active"
@@ -148,6 +163,7 @@ Content-Type: application/json
 5. Job sẽ hiển thị trên danh sách công khai
 
 ### Flow khi Admin Reject Job với Refund
+
 1. Admin gửi request với `status: "rejected"` và `rejection_reason`
 2. Hệ thống kiểm tra job có status là "pending" không
 3. Bắt đầu database transaction
@@ -170,11 +186,13 @@ Content-Type: application/json
 ## Database Impact
 
 ### Tables Affected
+
 1. **jobs** - Cập nhật `status` và `rejection_reason`
 2. **wallets** - Cập nhật `balance` và `total_spent`
 3. **wallet_transactions** - Tạo record mới với type "REFUND"
 
 ### Transaction Safety
+
 - Sử dụng Sequelize transaction để đảm bảo:
   - Nếu refund thất bại → job không bị reject
   - Nếu update job thất bại → wallet không bị thay đổi
@@ -187,9 +205,9 @@ Content-Type: application/json
 ```javascript
 // Recommended route protection
 router.put(
-  "/admin/jobs/:jobId/review", 
-  authenticate,        // Xác thực user
-  requireAdmin,        // Kiểm tra admin role
+  "/admin/jobs/:jobId/review",
+  authenticate, // Xác thực user
+  requireAdmin, // Kiểm tra admin role
   jobController.reviewJob
 );
 ```
@@ -197,6 +215,7 @@ router.put(
 ## Testing
 
 ### Test Case 1: Admin Approve Job
+
 ```bash
 curl -X PUT http://localhost:3003/api/admin/jobs/{jobId}/review \
   -H "Content-Type: application/json" \
@@ -207,6 +226,7 @@ curl -X PUT http://localhost:3003/api/admin/jobs/{jobId}/review \
 ```
 
 ### Test Case 2: Admin Reject Job with Refund
+
 ```bash
 curl -X PUT http://localhost:3003/api/admin/jobs/{jobId}/review \
   -H "Content-Type: application/json" \
@@ -218,6 +238,7 @@ curl -X PUT http://localhost:3003/api/admin/jobs/{jobId}/review \
 ```
 
 ### Test Case 3: Try to Review Already Processed Job
+
 ```bash
 # Gọi API review 2 lần để test logic
 # Lần 2 phải trả về error "Job has already been..."
