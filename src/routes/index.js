@@ -8,6 +8,9 @@ const chatRoutes = require("./chatRoutes");
 const walletRoutes = require("./walletRoutes");
 const videoCallRoutes = require("./videoCallRoutes");
 const platformReviewRoutes = require("./platformReviewRoutes");
+const adminDashboardRoutes = require("./adminDashboardRoutes");
+const platformRevenueRoutes = require("./platformRevenueRoutes");
+const jobReviewRoutes = require("./jobReviewRoutes");
 const { authenticate } = require("../middleware/auth");
 // const categoryRoutes = require("./categoryRoutes");
 
@@ -37,5 +40,8 @@ router.use("/", chatRoutes);
 router.use("/", walletRoutes);
 router.use("/", videoCallRoutes);
 router.use("/", platformReviewRoutes);
+router.use("/", adminDashboardRoutes);
+router.use("/", platformRevenueRoutes);
+router.use("/", jobReviewRoutes);
 // router.use("/v1", categoryRoutes);
 module.exports = router;

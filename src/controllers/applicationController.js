@@ -5,10 +5,14 @@ const {
   CV,
   Wallet,
   WalletTransaction,
+  PlatformRevenue,
   sequelize,
 } = require("../models");
 const { Op } = require("sequelize");
 const { createClient } = require("@supabase/supabase-js");
+
+// Phần trăm phí nền tảng
+const PLATFORM_FEE_PERCENTAGE = 3.0; // 3%
 
 // Initialize Supabase client (if configured)
 let supabase = null;
@@ -529,15 +533,26 @@ exports.completeJobAndTransferMoney = async (req, res) => {
     }
 
     // Lấy post_cost từ job (số tiền employer đã trả khi đăng tin)
-    const transferAmount = parseFloat(application.job.post_cost);
+    const totalJobAmount = parseFloat(application.job.post_cost);
 
-    if (!transferAmount || transferAmount <= 0) {
+    if (!totalJobAmount || totalJobAmount <= 0) {
       await transaction.rollback();
       return res.status(400).json({
         success: false,
         message: "Invalid job post cost. Cannot transfer money to freelancer.",
       });
     }
+
+    // Tính phí nền tảng (3%)
+    const platformFeeAmount = (totalJobAmount * PLATFORM_FEE_PERCENTAGE) / 100;
+    const freelancerReceiveAmount = totalJobAmount - platformFeeAmount;
+
+    console.log(`💰 Job completion payment breakdown:`);
+    console.log(`   - Total job amount: ${totalJobAmount} VND`);
+    console.log(
+      `   - Platform fee (${PLATFORM_FEE_PERCENTAGE}%): ${platformFeeAmount} VND`
+    );
+    console.log(`   - Freelancer receives: ${freelancerReceiveAmount} VND`);
 
     const freelancerId = application.applicant_id;
 
@@ -571,36 +586,65 @@ exports.completeJobAndTransferMoney = async (req, res) => {
       });
     }
 
-    // Cộng tiền vào ví freelancer
+    // Cộng tiền vào ví freelancer (sau khi trừ phí 3%)
     const freelancerBalanceBefore = parseFloat(freelancerWallet.balance);
-    const freelancerBalanceAfter = freelancerBalanceBefore + transferAmount;
+    const freelancerBalanceAfter =
+      freelancerBalanceBefore + freelancerReceiveAmount;
 
     await freelancerWallet.update(
       {
         balance: freelancerBalanceAfter,
         total_deposited:
-          parseFloat(freelancerWallet.total_deposited) + transferAmount,
+          parseFloat(freelancerWallet.total_deposited) +
+          freelancerReceiveAmount,
       },
       { transaction }
     );
 
     // Tạo transaction cho freelancer (nhận tiền)
-    await WalletTransaction.create(
+    const walletTransaction = await WalletTransaction.create(
       {
         wallet_id: freelancerWallet.id,
         transaction_type: "JOB_POST",
-        amount: transferAmount,
+        amount: freelancerReceiveAmount,
+        platform_fee: platformFeeAmount,
         currency: freelancerWallet.currency,
         balance_before: freelancerBalanceBefore,
         balance_after: freelancerBalanceAfter,
         reference_id: application.job.id,
         reference_type: "JOB_COMPLETED",
-        description: `Payment received for completing job: ${application.job.title}`,
+        description: `Payment received for completing job: ${application.job.title} (Platform fee: ${platformFeeAmount} VND)`,
         status: "completed",
         metadata: {
           job_id: application.job.id,
           application_id: application.id,
           employer_id: userId,
+          total_job_amount: totalJobAmount,
+          platform_fee_percentage: PLATFORM_FEE_PERCENTAGE,
+          platform_fee_amount: platformFeeAmount,
+          freelancer_receive_amount: freelancerReceiveAmount,
+        },
+      },
+      { transaction }
+    );
+
+    // Lưu platform revenue để tracking lợi nhuận
+    await PlatformRevenue.create(
+      {
+        transaction_id: walletTransaction.id,
+        job_id: application.job.id,
+        total_amount: totalJobAmount,
+        fee_percentage: PLATFORM_FEE_PERCENTAGE,
+        fee_amount: platformFeeAmount,
+        freelancer_amount: freelancerReceiveAmount,
+        freelancer_id: freelancerId,
+        employer_id: userId,
+        revenue_type: "JOB_COMPLETION",
+        description: `Platform fee from job: ${application.job.title}`,
+        metadata: {
+          job_title: application.job.title,
+          application_id: application.id,
+          completed_at: new Date(),
         },
       },
       { transaction }
@@ -626,7 +670,8 @@ exports.completeJobAndTransferMoney = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: "Job completed successfully. Money transferred to freelancer.",
+      message:
+        "Job completed successfully. Money transferred to freelancer (minus 3% platform fee).",
       data: {
         application: {
           id: application.id,
@@ -638,7 +683,10 @@ exports.completeJobAndTransferMoney = async (req, res) => {
           status: "completed",
         },
         payment: {
-          amount: transferAmount,
+          total_job_amount: totalJobAmount,
+          platform_fee_percentage: PLATFORM_FEE_PERCENTAGE,
+          platform_fee_amount: platformFeeAmount,
+          freelancer_receive_amount: freelancerReceiveAmount,
           currency: "VND",
           freelancer_id: freelancerId,
           freelancer_new_balance: freelancerBalanceAfter,

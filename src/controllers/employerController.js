@@ -1,24 +1,10 @@
 const { EmployerProfile, Wallet, sequelize } = require("../models");
 const { handleError } = require("../utils/helpers");
-const { createClient } = require("@supabase/supabase-js");
+const { supabase } = require("../config/supabase");
 const { env } = require("../config/env");
 
 // Số dư mặc định khi tạo ví
 const DEFAULT_WALLET_BALANCE = 0; // 1,000,000 VND
-
-// Initialize Supabase client for admin operations (if configured)
-let supabase = null;
-if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-  );
-  console.log("✅ Supabase client initialized for user role management");
-} else {
-  console.warn(
-    "⚠️ Supabase credentials not found. User role updates will be skipped."
-  );
-}
 
 /**
  * Register employer profile
