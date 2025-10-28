@@ -385,12 +385,15 @@ exports.getMyJobs = async (req, res) => {
 
 // Admin: Approve/Reject job posting
 exports.reviewJob = async (req, res) => {
+  const transaction = await sequelize.transaction();
+
   try {
     const { jobId } = req.params;
     const { status, rejection_reason } = req.body;
 
     // Validate status
     if (!["active", "rejected"].includes(status)) {
+      await transaction.rollback();
       return res.status(400).json({
         success: false,
         message: "Status must be 'active' or 'rejected'",
@@ -400,27 +403,80 @@ exports.reviewJob = async (req, res) => {
     // Find job
     const job = await Job.findOne({
       where: { id: jobId },
+      transaction,
     });
 
     if (!job) {
+      await transaction.rollback();
       return res.status(404).json({
         success: false,
         message: "Job not found",
       });
     }
 
-    // Update job status
-    await job.update({
-      status,
-      rejection_reason: status === "rejected" ? rejection_reason : null,
-    });
+    // Check if job is already processed
+    if (job.status !== "pending") {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: `Job has already been ${job.status}. Cannot review again.`,
+      });
+    }
 
-    res.status(200).json({
+    let refundResult = null;
+
+    // If rejected, refund money to employer's wallet
+    if (status === "rejected") {
+      try {
+        refundResult = await walletController.refundJobPost(
+          job.owner_id,
+          job.post_cost,
+          job.id,
+          rejection_reason || "Job posting rejected by admin",
+          transaction
+        );
+      } catch (walletError) {
+        await transaction.rollback();
+        return res.status(400).json({
+          success: false,
+          message: "Failed to refund money to wallet",
+          error: walletError.message,
+        });
+      }
+    }
+
+    // Update job status
+    await job.update(
+      {
+        status,
+        rejection_reason: status === "rejected" ? rejection_reason : null,
+      },
+      { transaction }
+    );
+
+    await transaction.commit();
+
+    const responseData = {
       success: true,
       message: `Job has been ${status === "active" ? "approved" : "rejected"}`,
-      data: job,
-    });
+      data: {
+        job,
+      },
+    };
+
+    // Add refund info if rejected
+    if (status === "rejected" && refundResult) {
+      responseData.data.refund = {
+        amount: job.post_cost,
+        new_balance: refundResult.balance_after,
+        transaction_id: refundResult.transaction.id,
+      };
+      responseData.message += `. Refunded ${job.post_cost} ${job.currency} to employer's wallet.`;
+    }
+
+    res.status(200).json(responseData);
   } catch (error) {
+    await transaction.rollback();
     res.status(500).json({
       success: false,
       message: "An error occurred while reviewing the job",

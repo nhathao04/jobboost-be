@@ -7,6 +7,7 @@ const employerRoutes = require("./employerRoutes");
 const chatRoutes = require("./chatRoutes");
 const walletRoutes = require("./walletRoutes");
 const videoCallRoutes = require("./videoCallRoutes");
+const platformReviewRoutes = require("./platformReviewRoutes");
 const { authenticate } = require("../middleware/auth");
 // const categoryRoutes = require("./categoryRoutes");
 
@@ -35,5 +36,6 @@ router.use("/", employerRoutes);
 router.use("/", chatRoutes);
 router.use("/", walletRoutes);
 router.use("/", videoCallRoutes);
+router.use("/", platformReviewRoutes);
 // router.use("/v1", categoryRoutes);
 module.exports = router;
