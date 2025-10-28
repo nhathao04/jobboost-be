@@ -12,7 +12,7 @@ const { Op } = require("sequelize");
 const { createClient } = require("@supabase/supabase-js");
 
 // Phần trăm phí nền tảng
-const PLATFORM_FEE_PERCENTAGE = 3.0; // 3%
+const PLATFORM_FEE_PERCENTAGE = 8.0; // 8%
 
 // Initialize Supabase client (if configured)
 let supabase = null;
@@ -543,7 +543,7 @@ exports.completeJobAndTransferMoney = async (req, res) => {
       });
     }
 
-    // Tính phí nền tảng (3%)
+    // Tính phí nền tảng (8%)
     const platformFeeAmount = (totalJobAmount * PLATFORM_FEE_PERCENTAGE) / 100;
     const freelancerReceiveAmount = totalJobAmount - platformFeeAmount;
 
@@ -586,7 +586,7 @@ exports.completeJobAndTransferMoney = async (req, res) => {
       });
     }
 
-    // Cộng tiền vào ví freelancer (sau khi trừ phí 3%)
+    // Cộng tiền vào ví freelancer (sau khi trừ phí 8%)
     const freelancerBalanceBefore = parseFloat(freelancerWallet.balance);
     const freelancerBalanceAfter =
       freelancerBalanceBefore + freelancerReceiveAmount;
@@ -671,7 +671,7 @@ exports.completeJobAndTransferMoney = async (req, res) => {
     res.status(200).json({
       success: true,
       message:
-        "Job completed successfully. Money transferred to freelancer (minus 3% platform fee).",
+        "Job completed successfully. Money transferred to freelancer (minus 8% platform fee).",
       data: {
         application: {
           id: application.id,

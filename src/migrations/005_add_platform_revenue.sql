@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS platform_revenues (
   
   -- Số tiền
   total_amount DECIMAL(15, 2) NOT NULL COMMENT 'Tổng số tiền của job',
-  fee_percentage DECIMAL(5, 2) NOT NULL DEFAULT 3.00 COMMENT 'Phần trăm phí (%)',
+  fee_percentage DECIMAL(5, 2) NOT NULL DEFAULT 8.00 COMMENT 'Phần trăm phí (%)',
   fee_amount DECIMAL(15, 2) NOT NULL COMMENT 'Số tiền phí thu được',
   freelancer_amount DECIMAL(15, 2) NOT NULL COMMENT 'Số tiền freelancer nhận được',
   
@@ -55,5 +55,5 @@ ORDER BY date DESC;
 
 -- 5. Comments
 COMMENT ON TABLE platform_revenues IS 'Bảng lưu trữ lợi nhuận của nền tảng từ các giao dịch';
-COMMENT ON COLUMN platform_revenues.fee_percentage IS 'Phần trăm phí, mặc định 3%';
+COMMENT ON COLUMN platform_revenues.fee_percentage IS 'Phần trăm phí, mặc định 8%';
 COMMENT ON COLUMN platform_revenues.fee_amount IS 'Số tiền phí thực tế thu được (total_amount * fee_percentage / 100)';

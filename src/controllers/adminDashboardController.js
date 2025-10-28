@@ -82,8 +82,8 @@ exports.getDashboardOverview = async (req, res) => {
     if (allUsers?.users) {
       allUsers.users.forEach((user) => {
         const role = user.user_metadata?.role || user.raw_user_meta_data?.role;
-        if (role === "freelancer") userStats.freelancers++;
-        else if (role === "employer") userStats.employers++;
+        if (role === "employer") userStats.employers++;
+        else userStats.freelancers++;
 
         if (!user.email_confirmed_at) userStats.unverified++;
 
@@ -438,6 +438,48 @@ exports.getRevenueDetails = async (req, res) => {
       raw: true,
     });
 
+    // Platform Profit Statistics (8% fee from completed jobs)
+    const platformProfitWhere = {};
+    if (start_date || end_date) {
+      platformProfitWhere.created_at = {};
+      if (start_date)
+        platformProfitWhere.created_at[Op.gte] = new Date(start_date);
+      if (end_date) platformProfitWhere.created_at[Op.lte] = new Date(end_date);
+    }
+
+    const platformProfit = await PlatformRevenue.findAll({
+      where: platformProfitWhere,
+      attributes: [
+        [sequelize.fn("SUM", sequelize.col("fee_amount")), "total_profit"],
+        [sequelize.fn("COUNT", sequelize.col("id")), "completed_jobs"],
+        [
+          sequelize.fn("AVG", sequelize.col("fee_amount")),
+          "average_profit_per_job",
+        ],
+        [sequelize.fn("SUM", sequelize.col("total_amount")), "total_job_value"],
+        [
+          sequelize.fn("SUM", sequelize.col("freelancer_amount")),
+          "total_paid_to_freelancers",
+        ],
+      ],
+      raw: true,
+    });
+
+    // Platform profit by day (last 30 days)
+    const platformProfitByDay = await PlatformRevenue.findAll({
+      where: {
+        created_at: { [Op.gte]: thirtyDaysAgo },
+      },
+      attributes: [
+        [sequelize.fn("DATE", sequelize.col("created_at")), "date"],
+        [sequelize.fn("SUM", sequelize.col("fee_amount")), "daily_profit"],
+        [sequelize.fn("COUNT", sequelize.col("id")), "daily_completed_jobs"],
+      ],
+      group: [sequelize.fn("DATE", sequelize.col("created_at"))],
+      order: [[sequelize.fn("DATE", sequelize.col("created_at")), "ASC"]],
+      raw: true,
+    });
+
     res.status(200).json({
       success: true,
       data: {
@@ -449,6 +491,7 @@ exports.getRevenueDetails = async (req, res) => {
           pages: Math.ceil(count / parseInt(limit)),
         },
         summary: {
+          // Doanh thu từ job posts (employer trả phí đăng job)
           total_revenue: parseFloat(summary[0]?.total_amount || 0).toFixed(2),
           transaction_count: parseInt(summary[0]?.transaction_count || 0),
           average_amount: parseFloat(summary[0]?.average_amount || 0).toFixed(
@@ -456,8 +499,27 @@ exports.getRevenueDetails = async (req, res) => {
           ),
           min_amount: parseFloat(summary[0]?.min_amount || 0).toFixed(2),
           max_amount: parseFloat(summary[0]?.max_amount || 0).toFixed(2),
+
+          // Lợi nhuận từ phí 8% khi job hoàn thành
+          platform_profit: {
+            total_profit: parseFloat(
+              platformProfit[0]?.total_profit || 0
+            ).toFixed(2),
+            completed_jobs: parseInt(platformProfit[0]?.completed_jobs || 0),
+            average_profit_per_job: parseFloat(
+              platformProfit[0]?.average_profit_per_job || 0
+            ).toFixed(2),
+            total_job_value: parseFloat(
+              platformProfit[0]?.total_job_value || 0
+            ).toFixed(2),
+            total_paid_to_freelancers: parseFloat(
+              platformProfit[0]?.total_paid_to_freelancers || 0
+            ).toFixed(2),
+            profit_percentage: "8%",
+          },
         },
         revenue_by_day: revenueByDay,
+        platform_profit_by_day: platformProfitByDay,
       },
     });
   } catch (error) {
