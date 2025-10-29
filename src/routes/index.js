@@ -11,6 +11,7 @@ const platformReviewRoutes = require("./platformReviewRoutes");
 const adminDashboardRoutes = require("./adminDashboardRoutes");
 const platformRevenueRoutes = require("./platformRevenueRoutes");
 const jobReviewRoutes = require("./jobReviewRoutes");
+const jobProductRoutes = require("./jobProductRoutes");
 const { authenticate } = require("../middleware/auth");
 // const categoryRoutes = require("./categoryRoutes");
 
@@ -43,5 +44,6 @@ router.use("/", platformReviewRoutes);
 router.use("/", adminDashboardRoutes);
 router.use("/", platformRevenueRoutes);
 router.use("/", jobReviewRoutes);
+router.use("/job-products", jobProductRoutes);
 // router.use("/v1", categoryRoutes);
 module.exports = router;
