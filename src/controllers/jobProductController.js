@@ -1,23 +1,19 @@
 const { JobProduct, Job } = require("../models");
 const fs = require("fs");
 const path = require("path");
+const firebaseStorageService = require("../services/firebaseStorage.service");
+const axios = require("axios");
 
 /**
- * Upload job product with files
+ * Upload job product with files (Firebase Storage)
  */
 const uploadProduct = async (req, res, next) => {
   try {
     const { job_id, title, description } = req.body;
-    const applicant_id = req.user.id; // From auth middleware
+    const applicant_id = req.userId; // From auth middleware
 
     // Validate required fields
     if (!job_id || !title) {
-      // Clean up uploaded files
-      if (req.files) {
-        req.files.forEach((file) => {
-          fs.unlinkSync(file.path);
-        });
-      }
       return res.status(400).json({
         success: false,
         message: "job_id and title are required",
@@ -27,27 +23,23 @@ const uploadProduct = async (req, res, next) => {
     // Validate job exists
     const job = await Job.findByPk(job_id);
     if (!job) {
-      // Clean up uploaded files
-      if (req.files) {
-        req.files.forEach((file) => {
-          fs.unlinkSync(file.path);
-        });
-      }
       return res.status(404).json({
         success: false,
         message: "Job not found",
       });
     }
 
-    // Prepare files array
-    const files = req.files
-      ? req.files.map((file) => ({
-          name: file.originalname,
-          path: file.path,
-          size: file.size,
-          mimetype: file.mimetype,
-        }))
-      : [];
+    // Get uploaded files from Firebase (set by uploadToFirebase middleware)
+    const files = req.uploadedFiles || [];
+    console.log("uploaded file: ", files);
+
+    // Validate that at least one file was uploaded
+    if (!files || files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "At least one file is required",
+      });
+    }
 
     // Create job product
     const jobProduct = await JobProduct.create({
@@ -61,20 +53,10 @@ const uploadProduct = async (req, res, next) => {
 
     res.status(201).json({
       success: true,
-      message: "Job product uploaded successfully",
+      message: "Job product uploaded successfully to Firebase",
       data: jobProduct,
     });
   } catch (error) {
-    // Clean up uploaded files on error
-    if (req.files) {
-      req.files.forEach((file) => {
-        try {
-          fs.unlinkSync(file.path);
-        } catch (err) {
-          console.error("Error deleting file:", err);
-        }
-      });
-    }
     next(error);
   }
 };
@@ -84,7 +66,7 @@ const uploadProduct = async (req, res, next) => {
  */
 const getMyProducts = async (req, res, next) => {
   try {
-    const applicant_id = req.user.id;
+    const applicant_id = req.userId;
     const {
       page = 1,
       limit = 10,
@@ -107,7 +89,7 @@ const getMyProducts = async (req, res, next) => {
         {
           model: Job,
           as: "job",
-          attributes: ["id", "title", "description", "employer_id"],
+          attributes: ["id", "title", "description", "owner_id"],
         },
       ],
       limit: parseInt(limit),
@@ -138,7 +120,7 @@ const getMyProducts = async (req, res, next) => {
 const getProductsByJob = async (req, res, next) => {
   try {
     const { jobId } = req.params;
-    const employer_id = req.user.id;
+    const employer_id = req.userId;
     const {
       page = 1,
       limit = 10,
@@ -156,7 +138,7 @@ const getProductsByJob = async (req, res, next) => {
       });
     }
 
-    if (job.employer_id !== employer_id) {
+    if (job.owner_id !== employer_id) {
       return res.status(403).json({
         success: false,
         message: "You do not have permission to view products for this job",
@@ -175,7 +157,7 @@ const getProductsByJob = async (req, res, next) => {
         {
           model: Job,
           as: "job",
-          attributes: ["id", "title", "description", "employer_id"],
+          attributes: ["id", "title", "description", "owner_id"],
         },
       ],
       limit: parseInt(limit),
@@ -207,7 +189,7 @@ const reviewProduct = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { status, rejection_reason } = req.body;
-    const reviewer_id = req.user.id;
+    const reviewer_id = req.userId;
 
     // Validate status
     if (!status || !["approved", "rejected"].includes(status)) {
@@ -243,7 +225,7 @@ const reviewProduct = async (req, res, next) => {
     }
 
     // Verify job belongs to employer
-    if (product.job.employer_id !== reviewer_id) {
+    if (product.job.owner_id !== reviewer_id) {
       return res.status(403).json({
         success: false,
         message: "You do not have permission to review this product",
@@ -269,12 +251,12 @@ const reviewProduct = async (req, res, next) => {
 };
 
 /**
- * Download job product file
+ * Download job product file (from Firebase Storage)
  */
 const downloadProductFile = async (req, res, next) => {
   try {
     const { id, fileIndex } = req.params;
-    const user_id = req.user.id;
+    const user_id = req.userId;
 
     const product = await JobProduct.findByPk(id, {
       include: [
@@ -293,17 +275,14 @@ const downloadProductFile = async (req, res, next) => {
     }
 
     // Check permission: must be product owner or job employer
-    if (
-      product.applicant_id !== user_id &&
-      product.job.employer_id !== user_id
-    ) {
+    if (product.applicant_id !== user_id && product.job.owner_id !== user_id) {
       return res.status(403).json({
         success: false,
         message: "You do not have permission to download this file",
       });
     }
 
-    // Get file from array
+    // Get file URL from array (now files is array of URLs)
     const index = parseInt(fileIndex);
     if (index < 0 || index >= product.files.length) {
       return res.status(404).json({
@@ -312,31 +291,56 @@ const downloadProductFile = async (req, res, next) => {
       });
     }
 
-    const file = product.files[index];
-    const filePath = path.resolve(file.path);
+    const fileUrl = product.files[index];
 
-    // Check if file exists
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({
+    // Option 1: Simple redirect (default behavior)
+    // return res.redirect(fileUrl);
+
+    // Option 2: Force download with proper filename
+    try {
+      // Extract filename from URL
+      const urlParts = fileUrl.split("/");
+      const filename = urlParts[urlParts.length - 1].split("?")[0]; // Remove query params
+
+      // Fetch file from Firebase Storage
+      const response = await axios({
+        method: "GET",
+        url: fileUrl,
+        responseType: "stream",
+      });
+
+      // Get content type from Firebase response
+      const contentType =
+        response.headers["content-type"] || "application/octet-stream";
+
+      // Set headers to force download
+      res.setHeader("Content-Type", contentType);
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${filename}"`
+      );
+
+      // Stream file to client
+      response.data.pipe(res);
+    } catch (downloadError) {
+      console.error("Error downloading file from Firebase:", downloadError);
+      return res.status(500).json({
         success: false,
-        message: "File not found on server",
+        message: "Error downloading file from storage",
       });
     }
-
-    // Send file
-    res.download(filePath, file.name);
   } catch (error) {
     next(error);
   }
 };
 
 /**
- * Delete job product (only if status is pending)
+ * Delete job product (only if status is pending) - Firebase Storage version
  */
 const deleteProduct = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const applicant_id = req.user.id;
+    const applicant_id = req.userId;
 
     const product = await JobProduct.findByPk(id);
 
@@ -363,17 +367,15 @@ const deleteProduct = async (req, res, next) => {
       });
     }
 
-    // Delete files from filesystem
+    // Delete files from Firebase Storage using service
     if (product.files && product.files.length > 0) {
-      product.files.forEach((file) => {
-        try {
-          if (fs.existsSync(file.path)) {
-            fs.unlinkSync(file.path);
-          }
-        } catch (err) {
-          console.error("Error deleting file:", err);
-        }
-      });
+      // product.files is now an array of URLs
+      const deleteResult = await firebaseStorageService.deleteMultipleFiles(
+        product.files
+      );
+      console.log(
+        `Deleted ${deleteResult.success}/${deleteResult.total} files`
+      );
     }
 
     // Delete product from database

@@ -30,9 +30,9 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
       },
       files: {
-        type: DataTypes.ARRAY(DataTypes.JSONB),
+        type: DataTypes.ARRAY(DataTypes.STRING),
         defaultValue: [],
-        comment: "Array of file objects with name, path, size, mimetype",
+        comment: "Array of Firebase Storage public URLs",
       },
       status: {
         type: DataTypes.STRING,
