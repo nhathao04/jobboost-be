@@ -1,0 +1,365 @@
+{
+  "info": {
+    "name": "Job Products API",
+    "description": "Collection for Job Product Upload and Review System - JobBoost Backend",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "job-products-api"
+  },
+  "item": [
+    {
+      "name": "1. Upload Job Product",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{auth_token}}",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "job_id",
+              "value": "123e4567-e89b-12d3-a456-426614174000",
+              "description": "UUID của job (required)",
+              "type": "text"
+            },
+            {
+              "key": "title",
+              "value": "Website Homepage Design",
+              "description": "Tiêu đề sản phẩm (required, 3-255 ký tự)",
+              "type": "text"
+            },
+            {
+              "key": "description",
+              "value": "Homepage mockup with responsive design for mobile and desktop",
+              "description": "Mô tả chi tiết sản phẩm (optional)",
+              "type": "text"
+            },
+            {
+              "key": "files",
+              "description": "File đính kèm (max 10 files, 25MB/file). Allowed: PDF, DOC, DOCX, XLS, XLSX, ZIP, JPG, PNG, GIF, TXT",
+              "type": "file",
+              "src": []
+            },
+            {
+              "key": "files",
+              "description": "File thứ 2 (optional)",
+              "type": "file",
+              "src": []
+            }
+          ]
+        },
+        "url": {
+          "raw": "http://14.186.87.64:3000/api/v1/job-products",
+          "protocol": "http",
+          "host": ["14", "186", "87", "64"],
+          "port": "3000",
+          "path": ["api", "v1", "job-products"]
+        },
+        "description": "Upload sản phẩm/deliverable cho một job với files đính kèm.\n\n**Freelancer** sử dụng API này để nộp bài/sản phẩm cho employer.\n\n**Request:**\n- job_id (UUID, required): ID của job\n- title (string, required): Tiêu đề sản phẩm (3-255 ký tự)\n- description (text, optional): Mô tả chi tiết\n- files (File[], optional): Tối đa 10 files, mỗi file max 25MB\n\n**Allowed file types:**\n- Documents: PDF, DOC, DOCX, XLS, XLSX, TXT\n- Archives: ZIP\n- Images: JPG, PNG, GIF\n\n**Response 201:**\n```json\n{\n  \"success\": true,\n  \"message\": \"Job product uploaded successfully\",\n  \"data\": {\n    \"id\": \"uuid\",\n    \"job_id\": \"uuid\",\n    \"applicant_id\": \"uuid\",\n    \"title\": \"Website Homepage Design\",\n    \"description\": \"...\",\n    \"files\": [...],\n    \"status\": \"pending\",\n    \"created_at\": \"2025-10-29T10:00:00.000Z\"\n  }\n}\n```"
+      },
+      "response": []
+    },
+    {
+      "name": "2. Get My Job Products",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{auth_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "http://14.186.87.64:3000/api/v1/job-products?page=1&limit=10&status=pending&sort=created_at&order=DESC",
+          "protocol": "http",
+          "host": ["14", "186", "87", "64"],
+          "port": "3000",
+          "path": ["api", "v1", "job-products"],
+          "query": [
+            {
+              "key": "page",
+              "value": "1",
+              "description": "Trang hiện tại (default: 1)"
+            },
+            {
+              "key": "limit",
+              "value": "10",
+              "description": "Số items mỗi trang (default: 10)"
+            },
+            {
+              "key": "status",
+              "value": "pending",
+              "description": "Lọc theo trạng thái: pending | approved | rejected (optional)"
+            },
+            {
+              "key": "job_id",
+              "value": "",
+              "description": "Lọc theo job_id (optional)",
+              "disabled": true
+            },
+            {
+              "key": "sort",
+              "value": "created_at",
+              "description": "Trường sắp xếp (default: created_at)"
+            },
+            {
+              "key": "order",
+              "value": "DESC",
+              "description": "Thứ tự: ASC | DESC (default: DESC)"
+            }
+          ]
+        },
+        "description": "Lấy danh sách sản phẩm của user hiện tại (freelancer) với phân trang và lọc.\n\n**Query Parameters:**\n- page (integer): Số trang (default: 1)\n- limit (integer): Số items/trang (default: 10)\n- status (string): Lọc theo trạng thái - pending, approved, rejected\n- job_id (UUID): Lọc theo job cụ thể\n- sort (string): Trường sắp xếp (default: created_at)\n- order (string): ASC hoặc DESC (default: DESC)\n\n**Response 200:**\n```json\n{\n  \"success\": true,\n  \"data\": {\n    \"products\": [\n      {\n        \"id\": \"uuid\",\n        \"job_id\": \"uuid\",\n        \"title\": \"Website Homepage Design\",\n        \"status\": \"pending\",\n        \"files\": [...],\n        \"created_at\": \"2025-10-29T10:00:00.000Z\",\n        \"job\": {\n          \"id\": \"uuid\",\n          \"title\": \"Build Modern Website\",\n          \"employer_id\": \"uuid\"\n        }\n      }\n    ],\n    \"pagination\": {\n      \"total\": 15,\n      \"page\": 1,\n      \"limit\": 10,\n      \"pages\": 2\n    }\n  }\n}\n```"
+      },
+      "response": []
+    },
+    {
+      "name": "3. Get Products by Job (Employer)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{auth_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "http://14.186.87.64:3000/api/v1/job-products/by-job/:jobId?page=1&limit=10&status=pending&sort=created_at&order=DESC",
+          "protocol": "http",
+          "host": ["14", "186", "87", "64"],
+          "port": "3000",
+          "path": ["api", "v1", "job-products", "by-job", ":jobId"],
+          "query": [
+            {
+              "key": "page",
+              "value": "1",
+              "description": "Trang hiện tại (default: 1)"
+            },
+            {
+              "key": "limit",
+              "value": "10",
+              "description": "Số items mỗi trang (default: 10)"
+            },
+            {
+              "key": "status",
+              "value": "pending",
+              "description": "Lọc theo trạng thái: pending | approved | rejected (optional)"
+            },
+            {
+              "key": "sort",
+              "value": "created_at",
+              "description": "Trường sắp xếp (default: created_at)"
+            },
+            {
+              "key": "order",
+              "value": "DESC",
+              "description": "Thứ tự: ASC | DESC (default: DESC)"
+            }
+          ],
+          "variable": [
+            {
+              "key": "jobId",
+              "value": "123e4567-e89b-12d3-a456-426614174000",
+              "description": "UUID của job cần xem submissions"
+            }
+          ]
+        },
+        "description": "**EMPLOYER ONLY** - Xem tất cả sản phẩm được nộp cho một job cụ thể.\n\n**Path Parameters:**\n- jobId (UUID, required): ID của job\n\n**Query Parameters:**\n- page, limit, status, sort, order (giống API #2)\n\n**Authorization:**\n- Chỉ employer sở hữu job mới có quyền xem\n- Trả về 403 Forbidden nếu không phải job owner\n\n**Response 200:**\n```json\n{\n  \"success\": true,\n  \"data\": {\n    \"products\": [\n      {\n        \"id\": \"uuid\",\n        \"job_id\": \"uuid\",\n        \"applicant_id\": \"freelancer-uuid\",\n        \"title\": \"Website Homepage Design\",\n        \"status\": \"pending\",\n        \"files\": [\n          {\n            \"name\": \"homepage.pdf\",\n            \"path\": \"uploads/job-products/...\",\n            \"size\": 1024000,\n            \"mimetype\": \"application/pdf\"\n          }\n        ],\n        \"created_at\": \"2025-10-29T10:00:00.000Z\",\n        \"job\": {...}\n      }\n    ],\n    \"pagination\": {...}\n  }\n}\n```\n\n**Errors:**\n- 403: Not the job owner\n- 404: Job not found"
+      },
+      "response": []
+    },
+    {
+      "name": "4. Approve Job Product",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{auth_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"approved\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://14.186.87.64:3000/api/v1/job-products/:id/review",
+          "protocol": "http",
+          "host": ["14", "186", "87", "64"],
+          "port": "3000",
+          "path": ["api", "v1", "job-products", ":id", "review"],
+          "variable": [
+            {
+              "key": "id",
+              "value": "550e8400-e29b-41d4-a716-446655440000",
+              "description": "UUID của job product cần approve"
+            }
+          ]
+        },
+        "description": "**EMPLOYER ONLY** - Phê duyệt (approve) một job product.\n\n**Path Parameters:**\n- id (UUID, required): ID của job product\n\n**Request Body:**\n```json\n{\n  \"status\": \"approved\"\n}\n```\n\n**Authorization:**\n- Chỉ employer sở hữu job mới có quyền review\n- Trả về 403 Forbidden nếu không phải job owner\n\n**Response 200:**\n```json\n{\n  \"success\": true,\n  \"message\": \"Job product approved successfully\",\n  \"data\": {\n    \"id\": \"uuid\",\n    \"status\": \"approved\",\n    \"reviewed_at\": \"2025-10-29T11:00:00.000Z\",\n    \"reviewed_by\": \"employer-uuid\",\n    \"rejection_reason\": null,\n    ...\n  }\n}\n```\n\n**Errors:**\n- 400: Invalid status\n- 403: Not the job owner\n- 404: Product not found"
+      },
+      "response": []
+    },
+    {
+      "name": "5. Reject Job Product",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{auth_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"rejected\",\n  \"rejection_reason\": \"Thiết kế không đúng với yêu cầu ban đầu. Vui lòng sửa lại màu sắc và bố cục theo brand guidelines đã gửi.\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://14.186.87.64:3000/api/v1/job-products/:id/review",
+          "protocol": "http",
+          "host": ["14", "186", "87", "64"],
+          "port": "3000",
+          "path": ["api", "v1", "job-products", ":id", "review"],
+          "variable": [
+            {
+              "key": "id",
+              "value": "550e8400-e29b-41d4-a716-446655440000",
+              "description": "UUID của job product cần reject"
+            }
+          ]
+        },
+        "description": "**EMPLOYER ONLY** - Từ chối (reject) một job product với lý do.\n\n**Path Parameters:**\n- id (UUID, required): ID của job product\n\n**Request Body:**\n```json\n{\n  \"status\": \"rejected\",\n  \"rejection_reason\": \"Lý do từ chối (REQUIRED khi reject)\"\n}\n```\n\n**⚠️ IMPORTANT:** \n- `rejection_reason` là BẮT BUỘC khi status = \"rejected\"\n- Nếu thiếu sẽ trả về lỗi 400\n\n**Authorization:**\n- Chỉ employer sở hữu job mới có quyền review\n\n**Response 200:**\n```json\n{\n  \"success\": true,\n  \"message\": \"Job product rejected successfully\",\n  \"data\": {\n    \"id\": \"uuid\",\n    \"status\": \"rejected\",\n    \"rejection_reason\": \"Thiết kế không đúng với yêu cầu...\",\n    \"reviewed_at\": \"2025-10-29T11:00:00.000Z\",\n    \"reviewed_by\": \"employer-uuid\",\n    ...\n  }\n}\n```\n\n**Errors:**\n- 400: Missing rejection_reason hoặc invalid status\n- 403: Not the job owner\n- 404: Product not found"
+      },
+      "response": []
+    },
+    {
+      "name": "6. Download Product File",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{auth_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "http://14.186.87.64:3000/api/v1/job-products/:id/files/:fileIndex",
+          "protocol": "http",
+          "host": ["14", "186", "87", "64"],
+          "port": "3000",
+          "path": ["api", "v1", "job-products", ":id", "files", ":fileIndex"],
+          "variable": [
+            {
+              "key": "id",
+              "value": "550e8400-e29b-41d4-a716-446655440000",
+              "description": "UUID của job product"
+            },
+            {
+              "key": "fileIndex",
+              "value": "0",
+              "description": "Index của file trong mảng files (bắt đầu từ 0)"
+            }
+          ]
+        },
+        "description": "Tải xuống một file cụ thể từ job product.\n\n**Path Parameters:**\n- id (UUID, required): ID của job product\n- fileIndex (integer, required): Index của file trong mảng files (0-based)\n\n**File Index Examples:**\n- fileIndex = 0: File đầu tiên\n- fileIndex = 1: File thứ hai\n- fileIndex = 2: File thứ ba\n- ...\n\n**Authorization:**\n- Product owner (freelancer đã upload) HOẶC\n- Job employer (người đăng job)\n- Trả về 403 nếu không phải 2 loại user trên\n\n**Response 200:**\n- File download stream\n- Header `Content-Disposition` chứa tên file gốc\n- Trình duyệt sẽ tự động download file\n\n**Example:**\nNếu product có files array:\n```json\n\"files\": [\n  {\"name\": \"homepage.pdf\", \"path\": \"...\"},\n  {\"name\": \"mockup.png\", \"path\": \"...\"},\n  {\"name\": \"wireframe.pdf\", \"path\": \"...\"}\n]\n```\n\nĐể download \"homepage.pdf\": fileIndex = 0\nĐể download \"mockup.png\": fileIndex = 1\nĐể download \"wireframe.pdf\": fileIndex = 2\n\n**Errors:**\n- 403: Not authorized (không phải owner hoặc employer)\n- 404: Product not found hoặc file index không tồn tại\n- 404: File not found on server (file đã bị xóa)"
+      },
+      "response": []
+    },
+    {
+      "name": "7. Delete Job Product",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{auth_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "http://14.186.87.64:3000/api/v1/job-products/:id",
+          "protocol": "http",
+          "host": ["14", "186", "87", "64"],
+          "port": "3000",
+          "path": ["api", "v1", "job-products", ":id"],
+          "variable": [
+            {
+              "key": "id",
+              "value": "550e8400-e29b-41d4-a716-446655440000",
+              "description": "UUID của job product cần xóa"
+            }
+          ]
+        },
+        "description": "Xóa một job product (CHỈ khi status = pending).\n\n**Path Parameters:**\n- id (UUID, required): ID của job product\n\n**⚠️ IMPORTANT - Điều kiện xóa:**\n1. User phải là người tạo product (product owner)\n2. Product phải có status = \"pending\"\n3. Nếu đã được review (approved/rejected) → KHÔNG THỂ XÓA\n\n**Authorization:**\n- Chỉ product owner (freelancer đã upload) mới có quyền xóa\n- Trả về 403 nếu không phải owner\n\n**File Cleanup:**\n- Tất cả files của product sẽ bị xóa khỏi server\n- Product record sẽ bị xóa khỏi database\n\n**Response 200:**\n```json\n{\n  \"success\": true,\n  \"message\": \"Job product deleted successfully\"\n}\n```\n\n**Errors:**\n- 400: Cannot delete product that has been reviewed (status = approved/rejected)\n- 403: Not the product owner\n- 404: Product not found\n\n**Use Cases:**\n- Freelancer upload nhầm file → Xóa và upload lại\n- Freelancer muốn sửa trước khi employer review\n- Hủy submission khi chưa được duyệt"
+      },
+      "response": []
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{auth_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [""]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [""]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://14.186.87.64:3000",
+      "type": "string"
+    },
+    {
+      "key": "auth_token",
+      "value": "your_jwt_token_here",
+      "type": "string"
+    }
+  ]
+}
