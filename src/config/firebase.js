@@ -7,7 +7,7 @@ class FirebaseService {
     if (admin.apps.length === 0) {
       const serviceAccount = require(path.join(
         process.cwd(),
-        "sworker-590e8-firebase-adminsdk-fbsvc-0f83ccc788.json"
+        process.env.FIREBASE_KEY || "sworker-590e8-firebase-adminsdk-fbsvc-0f83ccc788.json"
       ));
 
       admin.initializeApp({
