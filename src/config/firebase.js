@@ -5,10 +5,8 @@ class FirebaseService {
   constructor() {
     // Prevent multiple initializations
     if (admin.apps.length === 0) {
-      const serviceAccount = require(path.join(
-        process.cwd(),
-        process.env.FIREBASE_KEY || "sworker-590e8-firebase-adminsdk-fbsvc-0f83ccc788.json"
-      ));
+
+      const serviceAccount = JSON.parse(process.env.FIREBASE_KEY)
 
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
