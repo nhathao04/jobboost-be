@@ -12,6 +12,11 @@ const uploadProduct = async (req, res, next) => {
     const { job_id, title, description } = req.body;
     const applicant_id = req.userId; // From auth middleware
 
+    console.log("=== UPLOAD PRODUCT DEBUG ===");
+    console.log("req.body:", req.body);
+    console.log("req.files:", req.files);
+    console.log("req.uploadedFiles:", req.uploadedFiles);
+
     // Validate required fields
     if (!job_id || !title) {
       return res.status(400).json({

@@ -16,49 +16,55 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         validate: {
           len: [1, 255],
-          notEmpty: true
-        }
+          notEmpty: true,
+        },
       },
       description: {
         type: DataTypes.TEXT,
-        allowNull: true
+        allowNull: true,
       },
       file_name: {
         type: DataTypes.STRING,
-        allowNull: false
+        allowNull: false,
       },
       file_path: {
         type: DataTypes.STRING,
-        allowNull: false
+        allowNull: true,
+        comment: "Legacy local file path (deprecated)",
+      },
+      file_url: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+        comment: "Firebase Storage public URL",
       },
       file_size: {
         type: DataTypes.INTEGER,
-        allowNull: true
+        allowNull: true,
       },
       mime_type: {
         type: DataTypes.STRING,
         allowNull: false,
         validate: {
-          isIn: [['application/pdf']] // Only allow PDF files
-        }
+          isIn: [["application/pdf"]], // Only allow PDF files
+        },
       },
       is_primary: {
         type: DataTypes.BOOLEAN,
         defaultValue: false,
-        allowNull: false
+        allowNull: false,
       },
       status: {
         type: DataTypes.STRING,
-        defaultValue: 'active',
+        defaultValue: "active",
         allowNull: false,
         validate: {
-          isIn: [['active', 'archived', 'deleted']]
-        }
+          isIn: [["active", "archived", "deleted"]],
+        },
       },
       uploaded_at: {
         type: DataTypes.DATE,
-        defaultValue: DataTypes.NOW
-      }
+        defaultValue: DataTypes.NOW,
+      },
     },
     {
       tableName: "cvs",
@@ -67,15 +73,15 @@ module.exports = (sequelize, DataTypes) => {
       updatedAt: "updated_at",
       indexes: [
         {
-          fields: ["user_id"]
+          fields: ["user_id"],
         },
         {
-          fields: ["user_id", "is_primary"]
+          fields: ["user_id", "is_primary"],
         },
         {
-          fields: ["status"]
-        }
-      ]
+          fields: ["status"],
+        },
+      ],
     }
   );
 

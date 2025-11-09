@@ -1,14 +1,15 @@
 const { CV, sequelize } = require("../models");
-const path = require("path");
-const fs = require("fs");
 const { Op } = require("sequelize");
+const firebaseStorageService = require("../services/firebaseStorage.service");
+const axios = require("axios");
 
-// Upload a new CV
+// Upload a new CV to Firebase Storage
 exports.uploadCV = async (req, res) => {
   try {
     const userId = req.userId; // From auth middleware
 
-    if (!req.file) {
+    // Check if file was uploaded to Firebase (set by uploadToFirebase middleware)
+    if (!req.uploadedCV) {
       return res.status(400).json({
         success: false,
         message: "No file uploaded. Please upload a PDF file.",
@@ -19,20 +20,9 @@ exports.uploadCV = async (req, res) => {
 
     // Validation
     if (!name || name.trim().length === 0) {
-      // Delete uploaded file if validation fails
-      fs.unlinkSync(req.file.path);
       return res.status(400).json({
         success: false,
         message: "CV name is required",
-      });
-    }
-
-    // Check file type
-    if (req.file.mimetype !== 'application/pdf') {
-      fs.unlinkSync(req.file.path);
-      return res.status(400).json({
-        success: false,
-        message: "Only PDF files are allowed",
       });
     }
 
@@ -41,153 +31,151 @@ exports.uploadCV = async (req, res) => {
 
     try {
       // If this CV is set as primary, unset other primary CVs
-      if (isPrimary === 'true' || isPrimary === true) {
+      if (isPrimary === "true" || isPrimary === true) {
         await CV.update(
           { is_primary: false },
           {
             where: {
               user_id: userId,
-              is_primary: true
+              is_primary: true,
             },
-            transaction
+            transaction,
           }
         );
       }
 
-      // Create CV record
-      const cv = await CV.create({
-        user_id: userId,
-        name: name.trim(),
-        description: description?.trim() || null,
-        file_name: req.file.originalname,
-        file_path: req.file.path,
-        file_size: req.file.size,
-        mime_type: req.file.mimetype,
-        is_primary: isPrimary === 'true' || isPrimary === true,
-        status: 'active'
-      }, { transaction });
+      // Create CV record with Firebase Storage URL
+      const cv = await CV.create(
+        {
+          user_id: userId,
+          name: name.trim(),
+          description: description?.trim() || null,
+          file_name: req.uploadedCV.originalName,
+          file_url: req.uploadedCV.url,
+          file_size: req.uploadedCV.size,
+          mime_type: req.uploadedCV.mimetype,
+          is_primary: isPrimary === "true" || isPrimary === true,
+          status: "active",
+        },
+        { transaction }
+      );
 
       await transaction.commit();
 
       res.status(201).json({
         success: true,
-        message: "CV uploaded successfully",
+        message: "CV uploaded successfully to Firebase Storage",
         data: {
           id: cv.id,
           name: cv.name,
           description: cv.description,
           file_name: cv.file_name,
+          file_url: cv.file_url,
           file_size: cv.file_size,
           is_primary: cv.is_primary,
           uploaded_at: cv.uploaded_at,
-          created_at: cv.created_at
-        }
+          created_at: cv.created_at,
+        },
       });
-
     } catch (error) {
       await transaction.rollback();
-      // Delete uploaded file on database error
-      if (fs.existsSync(req.file.path)) {
-        fs.unlinkSync(req.file.path);
+      // Delete uploaded file from Firebase on database error
+      if (req.uploadedCV?.url) {
+        try {
+          await firebaseStorageService.deleteFile(req.uploadedCV.url);
+        } catch (deleteError) {
+          console.error("Error deleting file from Firebase:", deleteError);
+        }
       }
       throw error;
     }
-
   } catch (error) {
-       return res.status(500).json({
-            success: false,
-            message: "An error occurred while uploading the CV",
-            error: error.message,
-       });
+    return res.status(500).json({
+      success: false,
+      message: "An error occurred while uploading the CV",
+      error: error.message,
+    });
   }
 };
 
-// Get all CVs for current user
+// Get all CVs for current user with Firebase URLs
 exports.getUserCVs = async (req, res) => {
   try {
     const userId = req.userId; // From auth middleware
 
-    const { page = 1, limit = 10, status = 'active' } = req.query;
-    
+    const { page = 1, limit = 10, status = "active" } = req.query;
+
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
     const { count, rows: cvs } = await CV.findAndCountAll({
       where: {
         user_id: userId,
-        status: status
+        status: status,
       },
       order: [
-        ['is_primary', 'DESC'],
-        ['created_at', 'DESC']
+        ["is_primary", "DESC"],
+        ["created_at", "DESC"],
       ],
       limit: parseInt(limit),
       offset: offset,
-      attributes: {
-        exclude: ['file_path'] // Don't expose file paths in list
-      }
     });
 
     res.status(200).json({
       success: true,
-      message: "CVs retrieved successfully",
+      message: "CVs retrieved successfully from Firebase Storage",
       data: {
         cvs,
         pagination: {
           current_page: parseInt(page),
           total_pages: Math.ceil(count / parseInt(limit)),
           total_items: count,
-          items_per_page: parseInt(limit)
-        }
-      }
+          items_per_page: parseInt(limit),
+        },
+      },
     });
-
   } catch (error) {
     console.error("Error fetching CVs:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to fetch CVs",
-      error: error.message
+      error: error.message,
     });
   }
 };
 
-// Get single CV details
+// Get single CV details with Firebase URL
 exports.getCVById = async (req, res) => {
   try {
-    const userId = req.userId; // Replace with actual auth middleware value
+    const userId = req.userId;
     const { id } = req.params;
 
     const cv = await CV.findOne({
       where: {
         id,
         user_id: userId,
-        status: { [Op.ne]: 'deleted' }
+        status: { [Op.ne]: "deleted" },
       },
-      attributes: {
-        exclude: ['file_path'] // Don't expose file paths
-      }
     });
 
     if (!cv) {
       return res.status(404).json({
         success: false,
-        message: "CV not found"
+        message: "CV not found",
       });
     }
 
     res.status(200).json({
       success: true,
-      message: "CV retrieved successfully",
-      data: cv
+      message: "CV retrieved successfully from Firebase Storage",
+      data: cv,
     });
-
   } catch (error) {
     console.error("Error fetching CV:", error);
-       return res.status(500).json({
-            success: false,
-            message: "Failed to fetch CV",
-            error: error.message
-       });
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch CV",
+      error: error.message,
+    });
   }
 };
 
@@ -202,14 +190,14 @@ exports.updateCV = async (req, res) => {
       where: {
         id,
         user_id: userId,
-        status: { [Op.ne]: 'deleted' }
-      }
+        status: { [Op.ne]: "deleted" },
+      },
     });
 
     if (!cv) {
       return res.status(404).json({
         success: false,
-        message: "CV not found"
+        message: "CV not found",
       });
     }
 
@@ -218,26 +206,35 @@ exports.updateCV = async (req, res) => {
 
     try {
       // If setting this CV as primary, unset other primary CVs
-      if (isPrimary === true || isPrimary === 'true') {
+      if (isPrimary === true || isPrimary === "true") {
         await CV.update(
           { is_primary: false },
           {
             where: {
               user_id: userId,
               is_primary: true,
-              id: { [Op.ne]: id }
+              id: { [Op.ne]: id },
             },
-            transaction
+            transaction,
           }
         );
       }
 
       // Update CV
-      await cv.update({
-        name: name?.trim() || cv.name,
-        description: description !== undefined ? (description?.trim() || null) : cv.description,
-        is_primary: isPrimary !== undefined ? (isPrimary === true || isPrimary === 'true') : cv.is_primary
-      }, { transaction });
+      await cv.update(
+        {
+          name: name?.trim() || cv.name,
+          description:
+            description !== undefined
+              ? description?.trim() || null
+              : cv.description,
+          is_primary:
+            isPrimary !== undefined
+              ? isPrimary === true || isPrimary === "true"
+              : cv.is_primary,
+        },
+        { transaction }
+      );
 
       await transaction.commit();
 
@@ -251,72 +248,74 @@ exports.updateCV = async (req, res) => {
           file_name: cv.file_name,
           file_size: cv.file_size,
           is_primary: cv.is_primary,
-          updated_at: cv.updated_at
-        }
+          updated_at: cv.updated_at,
+        },
       });
-
     } catch (error) {
       await transaction.rollback();
       throw error;
     }
-
   } catch (error) {
     console.error("Error updating CV:", error);
-       return res.status(500).json({
-            success: false,
-            message: "Failed to update CV",
-            error: error.message
-           });
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update CV",
+      error: error.message,
+    });
   }
 };
 
-// Delete CV (soft delete)
+// Delete CV (soft delete) and remove from Firebase Storage
 exports.deleteCV = async (req, res) => {
   try {
-    const userId = req.userId; // Replace with actual auth middleware value
+    const userId = req.userId;
     const { id } = req.params;
 
     const cv = await CV.findOne({
       where: {
         id,
         user_id: userId,
-        status: { [Op.ne]: 'deleted' }
-      }
+        status: { [Op.ne]: "deleted" },
+      },
     });
 
     if (!cv) {
       return res.status(404).json({
         success: false,
-        message: "CV not found"
+        message: "CV not found",
       });
     }
 
     // Soft delete
     await cv.update({
-      status: 'deleted'
+      status: "deleted",
     });
 
-    // Delete physical file
-    if (fs.existsSync(cv.file_path)) {
-      fs.unlinkSync(cv.file_path);
+    // Delete file from Firebase Storage
+    if (cv.file_url) {
+      try {
+        await firebaseStorageService.deleteFile(cv.file_url);
+      } catch (deleteError) {
+        console.error("Error deleting file from Firebase:", deleteError);
+        // Continue even if Firebase deletion fails
+      }
     }
 
     res.status(200).json({
       success: true,
-      message: "CV deleted successfully"
+      message: "CV deleted successfully from database and Firebase Storage",
     });
-
   } catch (error) {
     console.error("Error deleting CV:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to delete CV",
-      error: error.message
+      error: error.message,
     });
   }
 };
 
-// Download CV file
+// Download CV file from Firebase Storage (force download with streaming)
 exports.downloadCV = async (req, res) => {
   try {
     const { id } = req.params;
@@ -324,33 +323,54 @@ exports.downloadCV = async (req, res) => {
     const cv = await CV.findOne({
       where: {
         id,
-        status: 'active'
-      }
+        status: "active",
+      },
     });
 
-    // Check if file exists
-    if (!fs.existsSync(cv.file_path)) {
+    if (!cv) {
       return res.status(404).json({
         success: false,
-        message: "CV file not found on server"
+        message: "CV not found",
       });
     }
 
-    // Set headers for file download
-    res.setHeader('Content-Type', cv.mime_type);
-    res.setHeader('Content-Disposition', `attachment; filename="${cv.file_name}"`);
-    res.setHeader('Content-Length', cv.file_size);
+    // Fetch file from Firebase Storage and stream to client
+    try {
+      // Extract filename from URL
+      const urlParts = cv.file_url.split("/");
+      const filename = urlParts[urlParts.length - 1].split("?")[0];
 
-    // Stream the file
-    const fileStream = fs.createReadStream(cv.file_path);
-    fileStream.pipe(res);
+      const response = await axios({
+        method: "GET",
+        url: cv.file_url,
+        responseType: "stream",
+      });
 
+      // Get content type from Firebase response
+      const contentType = response.headers["content-type"] || cv.mime_type;
+
+      // Set headers to force download
+      res.setHeader("Content-Type", contentType);
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${cv.file_name}"`
+      );
+
+      // Stream file to client
+      response.data.pipe(res);
+    } catch (downloadError) {
+      console.error("Error downloading CV from Firebase:", downloadError);
+      return res.status(500).json({
+        success: false,
+        message: "Error downloading CV from Firebase Storage",
+      });
+    }
   } catch (error) {
     console.error("Error downloading CV:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to download CV",
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -365,14 +385,14 @@ exports.setPrimaryCV = async (req, res) => {
       where: {
         id,
         user_id: userId,
-        status: 'active'
-      }
+        status: "active",
+      },
     });
 
     if (!cv) {
       return res.status(404).json({
         success: false,
-        message: "CV not found"
+        message: "CV not found",
       });
     }
 
@@ -386,16 +406,19 @@ exports.setPrimaryCV = async (req, res) => {
         {
           where: {
             user_id: userId,
-            is_primary: true
+            is_primary: true,
           },
-          transaction
+          transaction,
         }
       );
 
       // Set this CV as primary
-      await cv.update({
-        is_primary: true
-      }, { transaction });
+      await cv.update(
+        {
+          is_primary: true,
+        },
+        { transaction }
+      );
 
       await transaction.commit();
 
@@ -405,21 +428,19 @@ exports.setPrimaryCV = async (req, res) => {
         data: {
           id: cv.id,
           name: cv.name,
-          is_primary: cv.is_primary
-        }
+          is_primary: cv.is_primary,
+        },
       });
-
     } catch (error) {
       await transaction.rollback();
       throw error;
     }
-
   } catch (error) {
     console.error("Error setting primary CV:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to set primary CV",
-      error: error.message
+      error: error.message,
     });
   }
 };

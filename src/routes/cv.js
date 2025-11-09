@@ -1,11 +1,19 @@
 const express = require("express");
 const router = express.Router();
 const cvController = require("../controllers/cvController");
-const upload = require("../middleware/upload");
+const {
+  uploadCV,
+  uploadToFirebase,
+} = require("../middleware/uploadCVFirebase");
 const { authenticate } = require("../middleware/auth");
-// const { authenticate } = require("../middleware/auth"); // Uncomment when auth is implemented
 
-router.post("/cvs", authenticate, upload.single("cv"), cvController.uploadCV);
+router.post(
+  "/cvs",
+  authenticate,
+  uploadCV.single("cv"),
+  uploadToFirebase,
+  cvController.uploadCV
+);
 router.get("/cvs", authenticate, cvController.getUserCVs);
 router.get("/cvs/:id", authenticate, cvController.getCVById);
 router.put("/cvs/:id", authenticate, cvController.updateCV);
