@@ -17,8 +17,11 @@ class FirebaseStorageService {
     try {
       // Generate unique filename
       const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-      const ext = path.extname(fileMetadata.originalname);
-      const nameWithoutExt = path.basename(fileMetadata.originalname, ext);
+      // Accept either 'originalname' or 'originalName' to be tolerant of callers
+      const originalName =
+        fileMetadata.originalname || fileMetadata.originalName;
+      const ext = path.extname(originalName || "");
+      const nameWithoutExt = path.basename(originalName || "", ext);
       const fileName = `${folderPath}/${nameWithoutExt}-${uniqueSuffix}${ext}`;
 
       // Create file reference

@@ -193,7 +193,6 @@ exports.getJobById = async (req, res) => {
     const job = await Job.findOne({
       where: {
         id: jobId,
-        status: "active",
       },
     });
 

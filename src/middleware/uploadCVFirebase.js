@@ -32,9 +32,9 @@ const uploadToFirebase = async (req, res, next) => {
       return next();
     }
 
-    // Prepare file metadata
+    // Prepare file metadata (use keys expected by firebaseStorage.service)
     const fileMetadata = {
-      originalName: req.file.originalname,
+      originalname: req.file.originalname,
       mimetype: req.file.mimetype,
       size: req.file.size,
     };
