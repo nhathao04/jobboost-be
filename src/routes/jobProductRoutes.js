@@ -84,9 +84,9 @@ const {
  *     summary: Upload job product with files to Firebase Storage
  *     description: |
  *       Upload a job product with multiple files. Files are automatically uploaded to Firebase Storage.
- *       - Maximum 10 files per upload
- *       - Maximum 25MB per file
- *       - Supported formats: PDF, DOC, DOCX, XLS, XLSX, ZIP, JPG, PNG, GIF, TXT
+ *       - Maximum 5 files per upload (reduced due to larger file sizes)
+ *       - Maximum 100MB per file (supports video files)
+ *       - Supported formats: PDF, DOC, DOCX, XLS, XLSX, ZIP, JPG, PNG, GIF, TXT, MP4, MOV, AVI, MKV, WebM, FLV, WMV
  *       - Files are stored in Firebase Storage and publicly accessible via URL
  *     tags: [Job Products]
  *     security:
@@ -122,9 +122,9 @@ const {
  *                   type: string
  *                   format: binary
  *                 description: |
- *                   Product files to upload (max 10 files, 25MB each).
+ *                   Product files to upload (max 5 files, 100MB each).
  *                   Files will be uploaded to Firebase Storage automatically.
- *                   Allowed types: PDF, DOC, DOCX, XLS, XLSX, ZIP, JPG, PNG, GIF, TXT
+ *                   Allowed types: PDF, DOC, DOCX, XLS, XLSX, ZIP, JPG, PNG, GIF, TXT, MP4, MOV, AVI, MKV, WebM, FLV, WMV
  *     responses:
  *       201:
  *         description: Product uploaded successfully to Firebase Storage
@@ -200,7 +200,7 @@ const {
 router.post(
   "/",
   authenticate,
-  uploadJobProduct.array("files", 10),
+  uploadJobProduct.array("files", 5), // Maximum 5 files (updated for video support)
   uploadToFirebase,
   uploadProduct
 );
